@@ -427,6 +427,10 @@
   left: 50%;
   bottom: 80px;
   z-index: 2147482999;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
   width: min(72vw, 640px);
   min-height: 56px;
   padding: 0;
@@ -445,6 +449,10 @@
   left: 50%;
   bottom: 80px;
   z-index: 2147482999;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
   width: min(72vw, 640px);
   min-height: 56px;
   padding: 0;
@@ -502,8 +510,21 @@
   grid-template-columns: 1fr 1fr;
 }
 
+#ankiouo-root .ankiouo-slider-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+
 #ankiouo-root .ankiouo-import-row-wide {
   grid-template-columns: minmax(0, 1fr) 86px;
+}
+
+#ankiouo-root .ankiouo-slider-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-align: right;
+  min-width: 40px;
 }
 
 #ankiouo-root .ankiouo-inline-fields,

@@ -48,7 +48,7 @@ The desktop app mainly handles:
 4. Import subtitles, then click subtitle text to look up words
 
 - Screenshots are captured directly from the current video frame and sent to the desktop app with the export request
-- For audio, the extension sends the time range and `source-audio-url`; the desktop app first tries direct source clipping, then falls back to `yt-dlp` if needed
+- For audio, the extension sends the time range and `source-audio-url`; the desktop app uses bundled `ffmpeg` to trim audio, first trying direct source clipping and falling back to `yt-dlp` + `ffmpeg` when needed
 
 ## Tips
 
@@ -56,6 +56,6 @@ The desktop app mainly handles:
 - The swipe jump area is in the upper half of the screen by default
 - Swipe jump can be turned off with its button
 
-## Warning
+## Notice
 
 The desktop bridge opens local network endpoints, so it is not recommended to use VouoA on public or untrusted networks.

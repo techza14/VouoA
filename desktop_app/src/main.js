@@ -33,8 +33,6 @@ const I18N = {
     confirmApplyLapis: "Replace the current field mapping with the Lapis mapping?",
     bridgeControl: "Bridge Control",
     runtimeTitle: "Runtime Status",
-    start: "Start",
-    stop: "Stop",
     restart: "Restart",
     bridgeLabel: "Bridge",
     ankiLabel: "AnkiConnect",
@@ -83,8 +81,6 @@ const I18N = {
     confirmApplyLapis: "要用 Lapis 映射覆盖当前字段映射吗？",
     bridgeControl: "Bridge Control",
     runtimeTitle: "运行状态",
-    start: "启动",
-    stop: "停止",
     restart: "重启",
     bridgeLabel: "Bridge",
     ankiLabel: "AnkiConnect",
@@ -143,8 +139,6 @@ const elements = {
   audioStatusLabel: document.querySelector("#audio-status-label"),
   audioStatusDetail: document.querySelector("#audio-status-detail"),
   recentLogs: document.querySelector("#recent-logs"),
-  startBridge: document.querySelector("#start-bridge"),
-  stopBridge: document.querySelector("#stop-bridge"),
   restartBridge: document.querySelector("#restart-bridge"),
 };
 
@@ -247,8 +241,6 @@ function renderText() {
     "mapping-empty": t("mappingEmpty"),
     "eyebrow-bridge-control": t("bridgeControl"),
     "title-runtime": t("runtimeTitle"),
-    "start-bridge": t("start"),
-    "stop-bridge": t("stop"),
     "restart-bridge": t("restart"),
     "label-bridge": t("bridgeLabel"),
     "label-anki": t("ankiLabel"),
@@ -376,8 +368,6 @@ function renderStatus(snapshot) {
     }
   }
 
-  if (elements.startBridge) elements.startBridge.disabled = status.running;
-  if (elements.stopBridge) elements.stopBridge.disabled = !status.running;
 }
 
 function currentValueTemplate(fieldName) {
@@ -655,14 +645,6 @@ function bindEvents() {
     ensureConfig().field_map = nextMap;
     renderMappingPanel();
     await saveConfig({ field_map: nextMap });
-  });
-
-  elements.startBridge?.addEventListener("click", () => {
-    handleBridgeAction("start_bridge_command");
-  });
-
-  elements.stopBridge?.addEventListener("click", () => {
-    handleBridgeAction("stop_bridge_command");
   });
 
   elements.restartBridge?.addEventListener("click", () => {

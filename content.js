@@ -9,6 +9,9 @@
   const DEFAULT_PICTURE_FIELD = "Picture";
   const DEFAULT_DESKTOP_ANKI_URL = "http://127.0.0.1:5051/import";
   const DESKTOP_REQUEST_TIMEOUT_MS = 8000;
+  const LOOKUP_CSS_INITIAL_BATCH_SIZE = 5;
+  const LOOKUP_CSS_BATCH_SIZE = 5;
+  const LOOKUP_CSS_BATCH_CONCURRENCY = 2;
   const SUBTITLE_DRAG_THRESHOLD_PX = 8;
   const DESKTOP_ANKI_URL_STORAGE_KEY = "ankiouo.desktopAnkiUrl";
   const JIMAKU_CONFIG_STORAGE_KEY = "ankiouo.jimakuConfig";
@@ -17,6 +20,7 @@
   const SUBTITLE_POSITION_STORAGE_KEY = "ankiouo.subtitlePosition";
   const SUBTITLE_BACKGROUND_ENABLED_STORAGE_KEY = "ankiouo.subtitleBackgroundEnabled";
   const SUBTITLE_BACKGROUND_STYLE_STORAGE_KEY = "ankiouo.subtitleBackgroundStyle";
+  const SUBTITLE_BACKGROUND_OPACITY_STORAGE_KEY = "ankiouo.subtitleBackgroundOpacity";
   const SUBTITLE_CUSTOM_Y_STORAGE_KEY = "ankiouo.subtitleCustomY";
   const SWIPE_JUMP_ENABLED_STORAGE_KEY = "ankiouo.swipeJumpEnabled";
   const SWIPE_JUMP_MODE_STORAGE_KEY = "ankiouo.swipeJumpMode";
@@ -58,7 +62,7 @@
     pauseOnSubtitleLookup: true,
     resumeOnPopupClose: false,
     closeLookupAfterAdd: true,
-    lookupCssEnabled: true,
+    lookupCssEnabled: false,
     language: "en",
     currentLookupToken: "",
     currentLookupSurface: "",
@@ -66,9 +70,10 @@
     subtitleRenderToken: 0,
     rangePopupAnchorKey: "",
     subtitleOffsetMs: 0,
-    subtitlePositionMode: "custom",
+    subtitlePositionMode: "bottom",
     subtitleBackgroundEnabled: false,
     subtitleBackgroundStyle: "plate",
+    subtitleBackgroundOpacity: 0.34,
     subtitleOverlayHidden: false,
     subtitleQueue: [],
     subtitleQueueIndex: -1,
@@ -121,7 +126,10 @@
     lookupRequestContext: "",
     surfaceLookupCache: new Map(),
     desktopLookupCache: new Map(),
+    desktopLookupCssCache: new Map(),
+    desktopLookupInFlightCache: new Map(),
     desktopAnkiFieldsCache: new Map(),
+    desktopAnkiFieldsInFlightCache: new Map(),
     segmenter:
       typeof Intl !== "undefined" && typeof Intl.Segmenter !== "undefined"
         ? new Intl.Segmenter("ja", { granularity: "word" })
@@ -163,10 +171,11 @@
       clearSubtitle: "Clear Subtitle",
       pauseOnLookup: "Pause video when clicking subtitles",
       closeLookupAfterAdd: "Close Lookup after Add Anki",
-      lookupCss: "Lookup CSS",
+      lookupCss: "查词CSS",
       subtitleBackground: "Blur subtitle background",
       subtitleBackgroundStylePlate: "Backdrop",
       subtitleBackgroundStyleGlass: "Glass",
+      subtitleBackgroundOpacity: "Background opacity",
       quickHideSubtitle: "Hide",
       quickShowSubtitle: "Show",
       subtitleBottom: "Subtitle Bottom",
@@ -226,7 +235,6 @@
       statusLookupNone: "No results for \"{term}\".",
       statusNoLookupableWord: "No lookupable word found.",
       statusSelectWordFirst: "Enter a word to look up first.",
-      statusNoTextSelection: "No text selected on this page.",
       statusLookupLoadingDesktop: "Looking up via desktop Yomitan API...",
       statusRangeEmpty: "No active subtitle.",
       emptyLabel: "(empty)",
@@ -326,10 +334,11 @@
       clearSubtitle: "清空字幕",
       pauseOnLookup: "点击字幕时暂停视频",
       closeLookupAfterAdd: "Add Anki 后自动关闭 Lookup",
-      lookupCss: "Lookup CSS",
+      lookupCss: "词典CSS",
       subtitleBackground: "字幕背景模糊",
       subtitleBackgroundStylePlate: "Backdrop",
       subtitleBackgroundStyleGlass: "Glass",
+      subtitleBackgroundOpacity: "背景不透明度",
       quickHideSubtitle: "隐藏",
       quickShowSubtitle: "显示",
       subtitleBottom: "字幕在下方",
@@ -376,8 +385,8 @@
       statusPauseOff: "点击字幕时不再暂停视频。",
       statusCloseLookupOn: "Add Anki 后会自动关闭 Lookup。",
       statusCloseLookupOff: "Add Anki 后会保留 Lookup。",
-      statusLookupCssOn: "已开启 Lookup CSS。",
-      statusLookupCssOff: "已关闭 Lookup CSS。",
+      statusLookupCssOn: "已开启词典CSS。",
+      statusLookupCssOff: "已关闭词典CSS。",
       statusSubtitleBackgroundOn: "已开启字幕背景模糊。",
       statusSubtitleBackgroundOff: "已关闭字幕背景模糊。",
       statusSubtitleBackgroundStylePlate: "字幕背景样式已切换为 Backdrop。",
@@ -389,7 +398,6 @@
       statusLookupNone: "没有找到 “{term}”。",
       statusNoLookupableWord: "没有找到可查询的词。",
       statusSelectWordFirst: "先输入要查的单词。",
-      statusNoTextSelection: "当前网页没有选中文字。",
       statusLookupLoadingDesktop: "正在通过电脑端 Yomitan API 查词...",
       statusRangeEmpty: "当前没有激活字幕。",
       emptyLabel: "(空)",
@@ -634,6 +642,11 @@
         <button type="button" class="ankiouo-secondary ankiouo-mini" data-action="subtitle-bg-style-plate" data-i18n="subtitleBackgroundStylePlate">Backdrop</button>
         <button type="button" class="ankiouo-secondary ankiouo-mini" data-action="subtitle-bg-style-glass" data-i18n="subtitleBackgroundStyleGlass">Glass</button>
       </div>
+      <div class="ankiouo-import-row ankiouo-slider-row" data-field="subtitleBackgroundOpacityRow">
+        <label class="ankiouo-field-label ankiouo-inline-label" data-i18n="subtitleBackgroundOpacity">Background opacity</label>
+        <input data-field="subtitleBackgroundOpacity" type="range" min="0" max="1" step="0.02" value="0.34" />
+        <span class="ankiouo-slider-value" data-field="subtitleBackgroundOpacityValue">34%</span>
+      </div>
       <div class="ankiouo-import-row">
         <label class="ankiouo-field-label ankiouo-inline-label" data-i18n="topButtonsOnSubtitle">Top buttons on subtitle</label>
         <select data-field="launcherSelectionBehavior" class="ankiouo-desktop-url-input">
@@ -697,12 +710,8 @@
         />
         <button type="button" class="ankiouo-secondary ankiouo-mini" data-action="check-yomitan-api" data-i18n="checkYomitanApi">Check Yomitan API</button>
       </div>
-      <input data-field="query" type="hidden" value="" />
-      <button type="button" data-action="search" class="ankiouo-hidden"></button>
-      <button type="button" data-action="use-selection" class="ankiouo-hidden"></button>
       <div class="ankiouo-hidden" data-field="subtitleStage"></div>
       <div class="ankiouo-hidden" data-field="results"></div>
-      <button type="button" data-action="send-desktop-anki" class="ankiouo-hidden"></button>
       <textarea data-field="ankiTemplate" class="ankiouo-hidden">{expression}|{furigana-plain}|{reading}|{glossary-first}|{cloze-prefix}|{cloze-body}|{cloze-suffix}|{glossary}</textarea>
       <textarea data-field="ankiPreview" class="ankiouo-hidden"></textarea>
 
@@ -749,7 +758,6 @@
   const rootHomeParent = root.parentElement || document.documentElement;
   const overlayHomeParent = videoOverlay.parentElement || root;
   let fullscreenOverlayHost = null;
-  const queryInput = root.querySelector('[data-field="query"]');
   const subtitleFile = root.querySelector('[data-field="subtitleFile"]');
   const subtitleStage = root.querySelector('[data-field="subtitleStage"]');
   const subtitleQueueMeta = root.querySelector('[data-field="subtitleQueueMeta"]');
@@ -786,9 +794,6 @@
   const saveJimakuKeyButton = root.querySelector('[data-action="save-jimaku-key"]');
   const jimakuSearchButton = root.querySelector('[data-action="jimaku-search"]');
   const languageSelect = root.querySelector('[data-field="languageSelect"]');
-  const searchButton = root.querySelector('[data-action="search"]');
-  const useSelectionButton = root.querySelector('[data-action="use-selection"]');
-  const sendDesktopAnkiButton = root.querySelector('[data-action="send-desktop-anki"]');
   const closePopupButton = root.querySelector('[data-action="close-popup"]');
   const closeRangePopupButton = root.querySelector('[data-action="close-range-popup"]');
   const closeJimakuModalButton = root.querySelector('[data-action="close-jimaku-modal"]');
@@ -805,6 +810,9 @@
   const subtitleBackgroundStyleSwitch = root.querySelector('[data-field="subtitleBackgroundStyleSwitch"]');
   const subtitleBackgroundStylePlateButton = root.querySelector('[data-action="subtitle-bg-style-plate"]');
   const subtitleBackgroundStyleGlassButton = root.querySelector('[data-action="subtitle-bg-style-glass"]');
+  const subtitleBackgroundOpacityRow = root.querySelector('[data-field="subtitleBackgroundOpacityRow"]');
+  const subtitleBackgroundOpacityInput = root.querySelector('[data-field="subtitleBackgroundOpacity"]');
+  const subtitleBackgroundOpacityValue = root.querySelector('[data-field="subtitleBackgroundOpacityValue"]');
   const subtitlePosBottomButton = root.querySelector('[data-action="subtitle-pos-bottom"]');
   const subtitlePosTopButton = root.querySelector('[data-action="subtitle-pos-top"]');
   const subtitlePosCustomButton = root.querySelector('[data-action="subtitle-pos-custom"]');
@@ -1474,7 +1482,10 @@
   async function persistDesktopAnkiUrl(value) {
     const normalized = normalizeDesktopAnkiUrl(value);
     state.desktopLookupCache.clear();
+    state.desktopLookupCssCache.clear();
+    state.desktopLookupInFlightCache.clear();
     state.desktopAnkiFieldsCache.clear();
+    state.desktopAnkiFieldsInFlightCache.clear();
     try {
       if (EXTENSION_API && EXTENSION_API.storage && EXTENSION_API.storage.local) {
         await EXTENSION_API.storage.local.set({ [DESKTOP_ANKI_URL_STORAGE_KEY]: normalized });
@@ -1523,12 +1534,12 @@
         if (result && Object.prototype.hasOwnProperty.call(result, LOOKUP_CSS_ENABLED_STORAGE_KEY)) {
           return Boolean(result[LOOKUP_CSS_ENABLED_STORAGE_KEY]);
         }
-        return true;
+        return false;
       }
       const stored = localStorage.getItem(LOOKUP_CSS_ENABLED_STORAGE_KEY);
-      return stored == null ? true : stored === "true";
+      return stored == null ? false : stored === "true";
     } catch (error) {
-      return true;
+      return false;
     }
   }
 
@@ -1539,7 +1550,10 @@
       lookupCssToggle.checked = normalized;
     }
     state.desktopLookupCache.clear();
+    state.desktopLookupCssCache.clear();
+    state.desktopLookupInFlightCache.clear();
     state.desktopAnkiFieldsCache.clear();
+    state.desktopAnkiFieldsInFlightCache.clear();
     try {
       if (EXTENSION_API && EXTENSION_API.storage && EXTENSION_API.storage.local) {
         await EXTENSION_API.storage.local.set({ [LOOKUP_CSS_ENABLED_STORAGE_KEY]: normalized });
@@ -1559,16 +1573,16 @@
         if (value === "custom" && !Number.isFinite(Number(result ? result[SUBTITLE_CUSTOM_Y_STORAGE_KEY] : NaN))) {
           return "custom";
         }
-        return ["bottom", "top", "custom"].includes(value) ? value : "custom";
+        return ["bottom", "top", "custom"].includes(value) ? value : "bottom";
       }
       const value = String(localStorage.getItem(SUBTITLE_POSITION_STORAGE_KEY) || "").trim();
       const storedCustomY = localStorage.getItem(SUBTITLE_CUSTOM_Y_STORAGE_KEY);
       if (value === "custom" && (storedCustomY == null || !Number.isFinite(Number(storedCustomY)))) {
         return "custom";
       }
-      return ["bottom", "top", "custom"].includes(value) ? value : "custom";
+      return ["bottom", "top", "custom"].includes(value) ? value : "bottom";
     } catch (error) {
-      return "custom";
+      return "bottom";
     }
   }
 
@@ -1665,6 +1679,45 @@
     }
   }
 
+  function clampSubtitleBackgroundOpacity(value) {
+    if (value == null || value === "") return 0.34;
+    const normalized = Number(value);
+    if (!Number.isFinite(normalized)) return 0.34;
+    return Math.max(0, Math.min(1, normalized));
+  }
+
+  async function readStoredSubtitleBackgroundOpacity() {
+    try {
+      if (EXTENSION_API && EXTENSION_API.storage && EXTENSION_API.storage.local) {
+        const result = await EXTENSION_API.storage.local.get(SUBTITLE_BACKGROUND_OPACITY_STORAGE_KEY);
+        return clampSubtitleBackgroundOpacity(result?.[SUBTITLE_BACKGROUND_OPACITY_STORAGE_KEY]);
+      }
+      return clampSubtitleBackgroundOpacity(localStorage.getItem(SUBTITLE_BACKGROUND_OPACITY_STORAGE_KEY));
+    } catch (error) {
+      return 0.34;
+    }
+  }
+
+  async function persistSubtitleBackgroundOpacity(nextValue) {
+    const normalized = clampSubtitleBackgroundOpacity(nextValue);
+    state.subtitleBackgroundOpacity = normalized;
+    applySubtitleBlurUi();
+    rerenderActiveSubtitleOverlay();
+    try {
+      if (EXTENSION_API && EXTENSION_API.storage && EXTENSION_API.storage.local) {
+        await EXTENSION_API.storage.local.set({ [SUBTITLE_BACKGROUND_OPACITY_STORAGE_KEY]: normalized });
+        return;
+      }
+      localStorage.setItem(SUBTITLE_BACKGROUND_OPACITY_STORAGE_KEY, String(normalized));
+    } catch (error) {
+      // Ignore storage failures and keep the in-memory choice.
+    }
+  }
+
+  function formatSubtitleBackgroundOpacityLabel() {
+    return `${Math.round(clampSubtitleBackgroundOpacity(state.subtitleBackgroundOpacity) * 100)}%`;
+  }
+
   function rerenderActiveSubtitleOverlay() {
     if (state.activeCue) {
       void renderSubtitleCue(state.activeCue);
@@ -1678,11 +1731,20 @@
     if (subtitleBackgroundStyleSwitch) {
       subtitleBackgroundStyleSwitch.classList.toggle("ankiouo-hidden", !state.subtitleBackgroundEnabled);
     }
+    if (subtitleBackgroundOpacityRow) {
+      subtitleBackgroundOpacityRow.classList.toggle("ankiouo-hidden", !state.subtitleBackgroundEnabled);
+    }
     if (subtitleBackgroundStylePlateButton) {
       subtitleBackgroundStylePlateButton.classList.toggle("is-active", state.subtitleBackgroundStyle === "plate");
     }
     if (subtitleBackgroundStyleGlassButton) {
       subtitleBackgroundStyleGlassButton.classList.toggle("is-active", state.subtitleBackgroundStyle === "glass");
+    }
+    if (subtitleBackgroundOpacityInput) {
+      subtitleBackgroundOpacityInput.value = String(clampSubtitleBackgroundOpacity(state.subtitleBackgroundOpacity));
+    }
+    if (subtitleBackgroundOpacityValue) {
+      subtitleBackgroundOpacityValue.textContent = formatSubtitleBackgroundOpacityLabel();
     }
     if (videoOverlay) {
       videoOverlay.classList.toggle("ankiouo-subtitle-background-enabled", !!state.subtitleBackgroundEnabled);
@@ -2262,22 +2324,55 @@
     if (state.desktopAnkiFieldsCache.has(key)) {
       return state.desktopAnkiFieldsCache.get(key);
     }
-    const response = await fetchDesktopJson(buildDesktopBridgeUrl("/yomitan/ankiFields"), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        term: key
-      })
-    });
-    const payload = response.payload;
-    if (!response.ok || !payload || payload.ok === false) {
-      throw new Error((payload && payload.error) || `HTTP ${response.status}`);
+    if (state.desktopAnkiFieldsInFlightCache.has(key)) {
+      return state.desktopAnkiFieldsInFlightCache.get(key);
     }
-    const normalized = normalizeDesktopAnkiFieldsPayload(payload);
-    state.desktopAnkiFieldsCache.set(key, normalized);
-    return normalized;
+    const request = (async () => {
+      const response = await fetchDesktopJson(buildDesktopBridgeUrl("/yomitan/ankiFields"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          term: key
+        })
+      });
+      const payload = response.payload;
+      if (!response.ok || !payload || payload.ok === false) {
+        throw new Error((payload && payload.error) || `HTTP ${response.status}`);
+      }
+      const normalized = normalizeDesktopAnkiFieldsPayload(payload);
+      state.desktopAnkiFieldsCache.set(key, normalized);
+      return normalized;
+    })();
+    state.desktopAnkiFieldsInFlightCache.set(key, request);
+    try {
+      return await request;
+    } finally {
+      state.desktopAnkiFieldsInFlightCache.delete(key);
+    }
+  }
+
+  async function mapWithConcurrency(items, limit, mapper) {
+    const source = Array.isArray(items) ? items : [];
+    if (!source.length) return [];
+    const concurrency = Math.max(1, Math.min(Number(limit) || 1, source.length));
+    const results = new Array(source.length);
+    let cursor = 0;
+
+    const worker = async () => {
+      while (true) {
+        const index = cursor;
+        cursor += 1;
+        if (index >= source.length) {
+          return;
+        }
+        results[index] = await mapper(source[index], index);
+      }
+    };
+
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
+    return results;
   }
 
   function extractDictionaryBlocksFromGlossaryHtml(html) {
@@ -2443,7 +2538,7 @@
     });
   }
 
-  async function applyLookupCssPerEntry(entries, fallbackTerm) {
+  async function applyLookupCssPerEntry(entries, fallbackTerm, options = {}) {
     const sourceEntries = Array.isArray(entries) ? entries : [];
     if (!sourceEntries.length) {
       return sourceEntries;
@@ -2454,15 +2549,20 @@
       fallbackTerm
     });
 
-    const enhanced = await Promise.all(
-      sourceEntries.map(async (entry, entryIndex) => {
+    const concurrency = Math.max(1, Number(options.concurrency) || LOOKUP_CSS_BATCH_CONCURRENCY);
+    const enhanced = await mapWithConcurrency(sourceEntries, concurrency, async (entry, entryIndex) => {
         const term = String((entry && entry.expression) || fallbackTerm || "").trim();
         if (!term) {
           debugLookup("applyLookupCssPerEntrySkipNoTerm", { entryIndex });
           return entry;
         }
         try {
-          const fields = await fetchDesktopAnkiFields(term);
+          let fields;
+          try {
+            fields = await fetchDesktopAnkiFields(term);
+          } catch (firstError) {
+            fields = await fetchDesktopAnkiFields(term);
+          }
           const [nextEntry] = applyAnkiFieldsToLookupEntries([entry], fields, term);
           return nextEntry || entry;
         } catch (error) {
@@ -2473,8 +2573,7 @@
           });
           return entry;
         }
-      })
-    );
+      });
 
     return enhanced;
   }
@@ -2487,20 +2586,28 @@
     if (state.desktopLookupCache.has(key)) {
       return state.desktopLookupCache.get(key);
     }
-    const requestUrl = `${buildDesktopBridgeUrl("/lookup")}?term=${encodeURIComponent(key)}`;
-    const response = await fetchDesktopJson(requestUrl, { method: "GET" });
-    const payload = response.payload;
-    if (!response.ok || !payload || payload.ok === false) {
-      throw new Error((payload && payload.error) || `HTTP ${response.status}`);
+    if (state.desktopLookupInFlightCache.has(key)) {
+      return state.desktopLookupInFlightCache.get(key);
     }
-    let entries = convertDesktopLookupResult(payload.result, key);
-    const resolvedTerm = entries[0] ? String(entries[0].expression || key).trim() : key;
-    if (state.lookupCssEnabled) {
-      entries = await applyLookupCssPerEntry(entries, key);
+    const request = (async () => {
+      const requestUrl = `${buildDesktopBridgeUrl("/lookup")}?term=${encodeURIComponent(key)}`;
+      const response = await fetchDesktopJson(requestUrl, { method: "GET" });
+      const payload = response.payload;
+      if (!response.ok || !payload || payload.ok === false) {
+        throw new Error((payload && payload.error) || `HTTP ${response.status}`);
+      }
+      const entries = convertDesktopLookupResult(payload.result, key);
+      const resolvedTerm = entries[0] ? String(entries[0].expression || key).trim() : key;
+      const normalized = { entries, resolvedTerm };
+      state.desktopLookupCache.set(key, normalized);
+      return normalized;
+    })();
+    state.desktopLookupInFlightCache.set(key, request);
+    try {
+      return await request;
+    } finally {
+      state.desktopLookupInFlightCache.delete(key);
     }
-    const normalized = { entries, resolvedTerm };
-    state.desktopLookupCache.set(key, normalized);
-    return normalized;
   }
 
   async function fetchDesktopLookupAt(text, index) {
@@ -2519,12 +2626,7 @@
     if (!response.ok || !payload || payload.ok === false) {
       throw new Error((payload && payload.error) || `HTTP ${response.status}`);
     }
-    let entries = convertDesktopLookupResult(payload.result, payload.lookupQuery || payload.lookupSurface || "");
-    const lookupQuery = String(payload.lookupQuery || payload.lookupSurface || "").trim();
-    const lookupCssTerm = String(payload.lookupSurface || payload.lookupQuery || "").trim();
-    if (state.lookupCssEnabled) {
-      entries = await applyLookupCssPerEntry(entries, lookupCssTerm);
-    }
+    const entries = convertDesktopLookupResult(payload.result, payload.lookupQuery || payload.lookupSurface || "");
     return {
       lookupQuery: String(payload.lookupQuery || "").trim(),
       lookupSurface: String(payload.lookupSurface || "").trim(),
@@ -4283,7 +4385,7 @@
         explicitContext.bodyKana || ""
       );
     }
-    const base = String(lookupToken || queryInput.value.trim() || "");
+    const base = String(lookupToken || state.currentLookupToken || "");
     const candidates = [base, ...(Array.isArray(alternatives) ? alternatives : [])]
       .map((value) => String(value || "").trim())
       .filter(Boolean)
@@ -4802,7 +4904,7 @@
           : activeCue
             ? activeCue.text
             : "";
-    const expression = entry.expression || queryInput.value.trim();
+    const expression = entry.expression || state.currentLookupToken || "";
     const reading = entry.reading || "";
     const lookupToken = options.lookupToken != null ? String(options.lookupToken) : state.currentLookupToken || expression;
     const lookupSurface =
@@ -4920,7 +5022,7 @@
       return state.ankiPayload;
     }
 
-    if (!state.lastLookupEntry && !state.currentResults.length && !state.currentLookupToken && !queryInput.value.trim() && !state.activeCue) {
+    if (!state.lastLookupEntry && !state.currentResults.length && !state.currentLookupToken && !state.activeCue) {
       buildAnkiPayload(
         {
           expression: "食べる",
@@ -4940,7 +5042,6 @@
     const fallbackExpression =
       (state.lastLookupEntry && state.lastLookupEntry.expression) ||
       state.currentLookupToken ||
-      queryInput.value.trim() ||
       (state.activeCue ? state.activeCue.text.trim() : "") ||
       "Test";
 
@@ -5310,6 +5411,60 @@
     });
   }
 
+  async function renderLookupEntriesWithCss(entries, query, options = {}) {
+    const sourceEntries = Array.isArray(entries) ? entries : [];
+    const target = options.target || results;
+    const requestId = Number(options.requestId) || 0;
+    const contextKey = String(options.contextKey || "");
+    const popup = !!options.popup;
+    const fallbackTerm = String(options.fallbackTerm || query || "").trim();
+    const cacheKey = String(options.cacheKey || fallbackTerm || query || "").trim();
+
+    if (!sourceEntries.length || !state.lookupCssEnabled) {
+      renderEntries(sourceEntries, query, target);
+      if (cacheKey && state.lookupCssEnabled) {
+        state.desktopLookupCssCache.set(cacheKey, sourceEntries.slice());
+      }
+      if (popup) {
+        lookupPopup.classList.remove("ankiouo-hidden");
+      }
+      return sourceEntries;
+    }
+
+    if (cacheKey && state.desktopLookupCssCache.has(cacheKey)) {
+      const cachedEntries = state.desktopLookupCssCache.get(cacheKey) || [];
+      renderEntries(cachedEntries, query, target);
+      if (popup) {
+        lookupPopup.classList.remove("ankiouo-hidden");
+      }
+      return cachedEntries;
+    }
+
+    const rendered = [];
+    let startIndex = 0;
+    while (startIndex < sourceEntries.length) {
+      const batchSize = startIndex === 0 ? LOOKUP_CSS_INITIAL_BATCH_SIZE : LOOKUP_CSS_BATCH_SIZE;
+      const batch = sourceEntries.slice(startIndex, startIndex + batchSize);
+      const enhancedBatch = await applyLookupCssPerEntry(batch, fallbackTerm, {
+        concurrency: LOOKUP_CSS_BATCH_CONCURRENCY
+      });
+      if (!isActiveLookupRequest(requestId, contextKey)) {
+        return rendered;
+      }
+      rendered.push(...enhancedBatch);
+      renderEntries(rendered.slice(), query, target);
+      if (popup) {
+        lookupPopup.classList.remove("ankiouo-hidden");
+      }
+      startIndex += batchSize;
+    }
+
+    if (cacheKey) {
+      state.desktopLookupCssCache.set(cacheKey, rendered.slice());
+    }
+    return rendered;
+  }
+
   function groupEntriesBySurface(entries) {
     const normalizeSurfaceKey = (value) =>
       String(value || "")
@@ -5468,7 +5623,6 @@
     }
     const requestId = options.requestId || beginLookupRequest(normalized, options.target || results);
 
-    queryInput.value = normalized;
     state.currentLookupToken = normalized;
     state.currentLookupSurface = String(options.lookupSurface || normalized).trim();
     state.currentLookupClozeContext = options.clozeContext || null;
@@ -5496,10 +5650,14 @@
       return;
     }
 
-    renderEntries(enriched, normalized, options.target || results);
-    if (options.popup) {
-      lookupPopup.classList.remove("ankiouo-hidden");
-    }
+    await renderLookupEntriesWithCss(enriched, normalized, {
+      target: options.target || results,
+      requestId,
+      popup: !!options.popup,
+      fallbackTerm: normalized,
+      cacheKey: normalized
+    });
+    if (!isActiveLookupRequest(requestId)) return;
     if (enriched.length) {
       setStatus("");
       setLookupStatus("");
@@ -5822,6 +5980,37 @@
     return tokens;
   }
 
+  function rgba(red, green, blue, alpha) {
+    const normalizedAlpha = Math.max(0, Math.min(1, Number(alpha) || 0));
+    return `rgba(${red}, ${green}, ${blue}, ${normalizedAlpha.toFixed(3)})`;
+  }
+
+  function applySubtitleBackgroundPresentation(element) {
+    if (!element) return;
+    element.style.background = "transparent";
+    element.style.border = "0";
+    element.style.boxShadow = "none";
+
+    if (!state.subtitleBackgroundEnabled) {
+      return;
+    }
+
+    const opacity = clampSubtitleBackgroundOpacity(state.subtitleBackgroundOpacity);
+    if (state.subtitleBackgroundStyle === "glass") {
+      element.style.background = [
+        `linear-gradient(180deg, ${rgba(255, 255, 255, opacity * 0.28)}, ${rgba(255, 255, 255, opacity * 0.12)})`,
+        `linear-gradient(180deg, ${rgba(15, 23, 42, opacity * 0.52)}, ${rgba(15, 23, 42, opacity * 0.38)})`
+      ].join(", ");
+      element.style.border = `1px solid ${rgba(255, 255, 255, opacity * 0.32)}`;
+      element.style.boxShadow = `0 14px 32px ${rgba(2, 6, 23, opacity * 0.34)}, inset 0 1px 0 ${rgba(255, 255, 255, opacity * 0.22)}`;
+      return;
+    }
+
+    element.style.background = `linear-gradient(180deg, ${rgba(17, 24, 39, opacity)}, ${rgba(10, 14, 22, opacity * 0.82)})`;
+    element.style.border = `1px solid ${rgba(255, 255, 255, opacity * 0.24)}`;
+    element.style.boxShadow = `0 10px 28px ${rgba(2, 6, 23, opacity * 0.42)}, inset 0 1px 0 ${rgba(255, 255, 255, opacity * 0.14)}`;
+  }
+
   async function buildSubtitleLine(cue, options = {}) {
     const { overlay = false } = options;
     const wrapper = document.createElement("div");
@@ -5836,6 +6025,7 @@
             : "ankiouo-subtitle-line-background-plate"
         );
       }
+      applySubtitleBackgroundPresentation(wrapper);
     }
 
     if (!cue) {
@@ -5873,7 +6063,6 @@
         } else {
           state.resumeOnPopupClose = false;
         }
-        queryInput.value = clickedChar;
         setStatus(clickedChar);
         setLookupStatus(clickedChar);
         lookupPopup.classList.remove("ankiouo-hidden");
@@ -5916,12 +6105,18 @@
 
         if (Array.isArray(resolved.entries) && resolved.entries.length) {
           if (!isActiveLookupRequest(requestId, contextKey)) return;
-          queryInput.value = lookupQuery;
           state.currentLookupToken = lookupQuery;
           state.currentLookupSurface = lookupSurface;
           state.currentLookupClozeContext = clozeContext;
-          renderEntries(resolved.entries, lookupQuery, popupResults);
-          lookupPopup.classList.remove("ankiouo-hidden");
+          await renderLookupEntriesWithCss(resolved.entries, lookupQuery, {
+            target: popupResults,
+            requestId,
+            contextKey,
+            popup: true,
+            fallbackTerm: lookupSurface || lookupQuery,
+            cacheKey: lookupQuery
+          });
+          if (!isActiveLookupRequest(requestId, contextKey)) return;
           if (remoteError) {
             const message = t("statusDesktopLookupFallback", { error: remoteError.message });
             setLookupStatus(message);
@@ -6158,17 +6353,6 @@
     }
 
     state.videoRefreshHandle = window.setInterval(refreshSubtitleFromVideo, SUBTITLE_REFRESH_MS);
-  }
-
-  async function handleSearch() {
-    const query = queryInput.value.trim();
-    if (!query) {
-      setStatus(t("statusSelectWordFirst"));
-      queryInput.focus();
-      return;
-    }
-
-    await runLookup(query);
   }
 
   function parseSubtitleTextToCues(text, name) {
@@ -6776,7 +6960,7 @@
   function togglePanel() {
     panel.classList.toggle("ankiouo-hidden");
     if (!panel.classList.contains("ankiouo-hidden")) {
-      queryInput.focus();
+      desktopAnkiUrlInput?.focus();
     }
   }
 
@@ -6821,17 +7005,6 @@
       }
       togglePanel();
     });
-  }
-
-  function useSelection() {
-    const selected = String(window.getSelection ? window.getSelection().toString() : "").trim();
-    if (!selected) {
-      setStatus(t("statusNoTextSelection"));
-      return;
-    }
-
-    queryInput.value = selected;
-    handleSearch();
   }
 
   async function sendPayloadToDesktop(serverUrl, payload, options = {}) {
@@ -6956,6 +7129,7 @@
       state.customSubtitleY = await readStoredCustomSubtitleY();
       state.subtitleBackgroundEnabled = await readStoredSubtitleBackgroundEnabled();
       state.subtitleBackgroundStyle = await readStoredSubtitleBackgroundStyle();
+      state.subtitleBackgroundOpacity = await readStoredSubtitleBackgroundOpacity();
       state.swipeJumpEnabled = await readStoredSwipeJumpEnabled();
       state.swipeJumpMode = await readStoredSwipeJumpMode();
       state.swipeJumpStepSeconds = await readStoredSwipeJumpStep();
@@ -7145,9 +7319,6 @@
         });
     });
   }
-  if (searchButton) searchButton.addEventListener("click", handleSearch);
-  if (useSelectionButton) useSelectionButton.addEventListener("click", useSelection);
-  if (sendDesktopAnkiButton) sendDesktopAnkiButton.addEventListener("click", sendToDesktopAnki);
   if (closePopupButton) closePopupButton.addEventListener("click", closeLookupPopup);
   if (rangeAddAnkiButton) {
     rangeAddAnkiButton.addEventListener("pointerdown", (event) => {
@@ -7266,6 +7437,11 @@
     subtitleBackgroundStyleGlassButton.addEventListener("click", () => {
       void persistSubtitleBackgroundStyle("glass");
       setStatus(t("statusSubtitleBackgroundStyleGlass"));
+    });
+  }
+  if (subtitleBackgroundOpacityInput) {
+    subtitleBackgroundOpacityInput.addEventListener("input", () => {
+      void persistSubtitleBackgroundOpacity(subtitleBackgroundOpacityInput.value);
     });
   }
   if (launcherSelectionBehaviorSelect) {
@@ -7403,13 +7579,6 @@
       subtitleFile.value = "";
     }
   });
-  queryInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      handleSearch();
-    }
-  });
-
   window.addEventListener("resize", () => {
     if (state.trackedVideo) {
       positionOverlayToVideo(state.trackedVideo);

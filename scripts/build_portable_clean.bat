@@ -16,11 +16,13 @@ set "STAGE_DIR=%BUILD_DIR%\portable_clean_stage"
 set "PORTABLE_NAME=VouoA_Desktop_Portable_%APP_VERSION%"
 set "PORTABLE_DIR=%OUT_DIR%\%PORTABLE_NAME%"
 set "PORTABLE_ZIP=%OUT_DIR%\%PORTABLE_NAME%.zip"
-set "DESKTOP_EXE_SOURCE=%CD%\desktop_app\src-tauri\target\release\desktop_app.exe"
+set "DESKTOP_APP_DIR=%CD%\desktop_app"
+set "DESKTOP_EXE_SOURCE="
 set "BRIDGE_EXE_SOURCE=%CD%\dist\anki_bridge_server.exe"
 set "BRIDGE_RES_DIR=%CD%\desktop_app\src-tauri\resources\bridge"
-set "PORTABLE_DESKTOP_EXE=%PORTABLE_DIR%\desktop_app.exe"
+set "PORTABLE_DESKTOP_EXE=%PORTABLE_DIR%\VouoA_Desktop.exe"
 set "PORTABLE_BRIDGE_EXE=%PORTABLE_DIR%\bridge\anki_bridge_server.exe"
+set "FFMPEG_SOURCE="
 
 if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
@@ -34,10 +36,22 @@ python -m PyInstaller --clean --noconfirm anki_bridge_server.spec
 if errorlevel 1 exit /b 1
 
 echo [3/5] Building desktop executable...
-cd /d "%CD%\desktop_app"
+cd /d "%DESKTOP_APP_DIR%"
+if not exist "node_modules\.bin\tauri.cmd" (
+  echo Tauri CLI not found under desktop_app\node_modules. Running npm ci...
+  call npm ci
+  if errorlevel 1 exit /b 1
+)
 call npm run build
 if errorlevel 1 exit /b 1
 cd /d "%REPO_ROOT%"
+
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$candidates = @(); $preferred = Join-Path '%DESKTOP_APP_DIR%' 'src-tauri\\target\\release\\desktop_app.exe'; if (Test-Path $preferred) { $candidates += Get-Item $preferred }; $topLevel = Get-ChildItem -Path (Join-Path '%DESKTOP_APP_DIR%' 'src-tauri\\target\\release') -Filter *.exe -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending; if ($topLevel) { $candidates += $topLevel }; $choice = $candidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if ($choice) { $choice.FullName }"`) do set "DESKTOP_EXE_SOURCE=%%P"
+
+if not defined DESKTOP_EXE_SOURCE (
+  echo Failed: desktop executable was not produced by the Tauri build.
+  exit /b 1
+)
 
 if not exist "%DESKTOP_EXE_SOURCE%" (
   echo Failed: desktop executable not found: "%DESKTOP_EXE_SOURCE%"
@@ -54,6 +68,18 @@ if not exist "%BRIDGE_RES_DIR%" (
   exit /b 1
 )
 
+if exist "%BRIDGE_RES_DIR%\ffmpeg.exe" (
+  set "FFMPEG_SOURCE=%BRIDGE_RES_DIR%\ffmpeg.exe"
+) else (
+  for /f "usebackq delims=" %%F in (`powershell -NoProfile -Command "$ffmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue; if ($ffmpeg) { $ffmpeg.Source }"`) do set "FFMPEG_SOURCE=%%F"
+)
+
+if not defined FFMPEG_SOURCE (
+  echo Failed: ffmpeg.exe was not found.
+  echo Put ffmpeg.exe in "%BRIDGE_RES_DIR%" or make ffmpeg available on PATH before packaging.
+  exit /b 1
+)
+
 echo [4/5] Creating clean portable staging directory...
 if exist "%PORTABLE_DESKTOP_EXE%" powershell -NoProfile -Command "Get-Process | Where-Object { $_.Path -eq '%PORTABLE_DESKTOP_EXE%' } | Stop-Process -Force"
 if exist "%PORTABLE_BRIDGE_EXE%" powershell -NoProfile -Command "Get-Process | Where-Object { $_.Path -eq '%PORTABLE_BRIDGE_EXE%' } | Stop-Process -Force"
@@ -66,13 +92,18 @@ if exist "%PORTABLE_DIR%" (
 mkdir "%STAGE_DIR%"
 mkdir "%STAGE_DIR%\bridge"
 
-copy /y "%DESKTOP_EXE_SOURCE%" "%STAGE_DIR%\desktop_app.exe" >nul
+copy /y "%DESKTOP_EXE_SOURCE%" "%STAGE_DIR%\VouoA_Desktop.exe" >nul
+if errorlevel 1 exit /b 1
 copy /y "%BRIDGE_EXE_SOURCE%" "%STAGE_DIR%\bridge\anki_bridge_server.exe" >nul
-copy /y "%BRIDGE_RES_DIR%\anki_bridge_config.json" "%STAGE_DIR%\bridge\anki_bridge_config.json" >nul
+if errorlevel 1 exit /b 1
 copy /y "%BRIDGE_RES_DIR%\change_deck.bat" "%STAGE_DIR%\bridge\change_deck.bat" >nul
-copy /y "%BRIDGE_RES_DIR%\ffmpeg.exe" "%STAGE_DIR%\bridge\ffmpeg.exe" >nul
+if errorlevel 1 exit /b 1
 copy /y "%BRIDGE_RES_DIR%\README.txt" "%STAGE_DIR%\bridge\README.txt" >nul
+if errorlevel 1 exit /b 1
 copy /y "%BRIDGE_RES_DIR%\start.bat" "%STAGE_DIR%\bridge\start.bat" >nul
+if errorlevel 1 exit /b 1
+copy /y "%FFMPEG_SOURCE%" "%STAGE_DIR%\bridge\ffmpeg.exe" >nul
+if errorlevel 1 exit /b 1
 
 if exist "%STAGE_DIR%\vouoa_desktop.log" del /f /q "%STAGE_DIR%\vouoa_desktop.log"
 if exist "%STAGE_DIR%\bridge\anki_bridge.log" del /f /q "%STAGE_DIR%\bridge\anki_bridge.log"

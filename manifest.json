@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VouoA",
-  "version": "1.1.15",
+  "version": "1.0.0",
   "description": "Subtitle support, plus lookup and Anki export with a desktop Yomitan bridge.",
   "icons": {
     "16": "icons/icon16.png",

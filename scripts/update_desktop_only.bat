@@ -20,12 +20,12 @@ cd /d "%REPO_ROOT%"
 
 set "PORTABLE_DIR=%CD%\out\VouoA_Desktop_Portable_%APP_VERSION%"
 set "SOURCE_EXE=%CD%\desktop_app\src-tauri\target\release\desktop_app.exe"
-set "PORTABLE_EXE=%PORTABLE_DIR%\desktop_app.exe"
+set "PORTABLE_EXE=%PORTABLE_DIR%\VouoA_Desktop.exe"
 
 if not exist "%CD%\out" mkdir "%CD%\out"
 if not exist "%PORTABLE_DIR%" mkdir "%PORTABLE_DIR%"
 
-powershell -NoProfile -Command "Get-Process | Where-Object { $_.ProcessName -like 'desktop_app' -and $_.Path -eq '%PORTABLE_EXE%' } | Stop-Process -Force"
+powershell -NoProfile -Command "$procs = Get-Process | Where-Object { $_.Path -eq '%PORTABLE_EXE%' }; if ($procs) { $procs | Stop-Process -Force -PassThru | Wait-Process }"
 
 copy /y "%SOURCE_EXE%" "%PORTABLE_EXE%" >nul
 if errorlevel 1 (
@@ -33,7 +33,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-start "" "%PORTABLE_EXE%"
+powershell -NoProfile -Command "Start-Process -FilePath '%PORTABLE_EXE%'"
 
 echo Updated portable desktop app: "%PORTABLE_EXE%"
 exit /b 0
