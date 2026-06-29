@@ -29,7 +29,6 @@ const YOMITAN_PROBE_TIMEOUT: Duration = Duration::from_secs(1);
 pub struct ProbeState {
     pub ok: bool,
     pub code: String,
-    pub label: String,
     pub detail: String,
 }
 
@@ -471,13 +470,11 @@ fn probe_bridge_health() -> ProbeState {
         Ok(_) => ProbeState {
             ok: true,
             code: "connected".into(),
-            label: "Bridge Online".into(),
             detail: "Local bridge is responding to /health".into(),
         },
         Err(error) => ProbeState {
             ok: false,
             code: "disconnected".into(),
-            label: "Bridge Offline".into(),
             detail: error,
         },
     }
@@ -494,14 +491,12 @@ fn probe_anki_connect() -> ProbeState {
             ProbeState {
                 ok: true,
                 code: "connected".into(),
-                label: "AnkiConnect Connected".into(),
                 detail: format!("Detected {decks} decks"),
             }
         }
         Err(error) => ProbeState {
             ok: false,
             code: "disconnected".into(),
-            label: "AnkiConnect Disconnected".into(),
             detail: error,
         },
     }
@@ -514,7 +509,6 @@ fn probe_yomitan_api() -> ProbeState {
             return ProbeState {
                 ok: false,
                 code: "disconnected".into(),
-                label: "Yomitan API Disconnected".into(),
                 detail: error,
             }
         }
@@ -524,7 +518,6 @@ fn probe_yomitan_api() -> ProbeState {
         Ok(yomitan) => ProbeState {
             ok: true,
             code: "connected".into(),
-            label: "Yomitan API Connected".into(),
             detail: format!(
                 "Server version: {}; Yomitan version: {}",
                 server
@@ -540,7 +533,6 @@ fn probe_yomitan_api() -> ProbeState {
         Err(error) => ProbeState {
             ok: false,
             code: "disconnected".into(),
-            label: "Yomitan API Disconnected".into(),
             detail: error,
         },
     }
@@ -594,7 +586,6 @@ pub fn get_snapshot(app: &AppHandle, state: &SharedState) -> Result<AppSnapshot,
         ProbeState {
             ok: false,
             code: "unchecked".into(),
-            label: "AnkiConnect Not Checked".into(),
             detail: "Bridge is not running".into(),
         }
     };
@@ -609,7 +600,6 @@ pub fn get_snapshot(app: &AppHandle, state: &SharedState) -> Result<AppSnapshot,
         ProbeState {
             ok: false,
             code: "unchecked".into(),
-            label: "Yomitan API Not Checked".into(),
             detail: "Bridge is not running".into(),
         }
     };

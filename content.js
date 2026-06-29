@@ -9,9 +9,35 @@
   const DEFAULT_PICTURE_FIELD = "Picture";
   const DEFAULT_DESKTOP_ANKI_URL = "http://127.0.0.1:5051/import";
   const DESKTOP_REQUEST_TIMEOUT_MS = 8000;
-  const LOOKUP_CSS_INITIAL_BATCH_SIZE = 5;
-  const LOOKUP_CSS_BATCH_SIZE = 5;
   const LOOKUP_CSS_BATCH_CONCURRENCY = 2;
+  const DESKTOP_ANKI_FIELDS_MARKERS = [
+    "conjugation",
+    "dictionary",
+    "dictionary-alias",
+    "expression",
+    "frequency-average-occurrence",
+    "frequency-average-rank",
+    "frequencies",
+    "frequency-harmonic-occurrence",
+    "frequency-harmonic-rank",
+    "furigana",
+    "furigana-plain",
+    "glossary",
+    "glossary-brief",
+    "glossary-first",
+    "glossary-first-brief",
+    "glossary-first-no-dictionary",
+    "glossary-no-dictionary",
+    "glossary-plain",
+    "glossary-plain-no-dictionary",
+    "part-of-speech",
+    "phonetic-transcriptions",
+    "reading",
+    "tags",
+    "pitch-accents",
+    "pitch-accent-categories",
+    "pitch-accent-positions"
+  ];
   const SUBTITLE_DRAG_THRESHOLD_PX = 8;
   const DESKTOP_ANKI_URL_STORAGE_KEY = "ankiouo.desktopAnkiUrl";
   const JIMAKU_CONFIG_STORAGE_KEY = "ankiouo.jimakuConfig";
@@ -170,8 +196,8 @@
       subtitleQueueUi: "Show queue controls",
       clearSubtitle: "Clear Subtitle",
       pauseOnLookup: "Pause video when clicking subtitles",
-      closeLookupAfterAdd: "Close Lookup after Add Anki",
-      lookupCss: "查词CSS",
+      closeLookupAfterAdd: "Close lookup after export",
+      lookupCss: "Lookup CSS",
       subtitleBackground: "Blur subtitle background",
       subtitleBackgroundStylePlate: "Backdrop",
       subtitleBackgroundStyleGlass: "Glass",
@@ -197,7 +223,6 @@
       jimakuQueryPlaceholder: "Title / JP title / Romaji",
       jimakuEpisodePlaceholder: "Episode",
       jimakuStatusLocal: "Jimaku API key is stored locally in the extension.",
-      lookupViaDesktop: "",
       startBridgeHint: "Start the desktop bridge and enable the API in Yomitan.",
       noSubtitleImported: "No subtitle imported.",
       subtitleFollowHint: "Import an .srt or .ass subtitle to start following the video.",
@@ -220,8 +245,8 @@
       statusDesktopUpdated: "Desktop address updated.",
       statusPauseOn: "Video will pause when clicking subtitles.",
       statusPauseOff: "Video will keep playing when clicking subtitles.",
-      statusCloseLookupOn: "Lookup will close after Add Anki.",
-      statusCloseLookupOff: "Lookup will stay open after Add Anki.",
+      statusCloseLookupOn: "Lookup will close after export.",
+      statusCloseLookupOff: "Lookup will stay open after export.",
       statusLookupCssOn: "Lookup CSS enabled.",
       statusLookupCssOff: "Lookup CSS disabled.",
       statusSubtitleBackgroundOn: "Subtitle background enabled.",
@@ -231,7 +256,6 @@
       statusSubtitleOverlayHidden: "Subtitle overlay hidden.",
       statusSubtitleOverlayShown: "Subtitle overlay restored.",
       statusLookupSearching: "Looking up \"{term}\"...",
-      statusLookupFound: "Found {count} results.",
       statusLookupNone: "No results for \"{term}\".",
       statusNoLookupableWord: "No lookupable word found.",
       statusSelectWordFirst: "Enter a word to look up first.",
@@ -263,7 +287,7 @@
       subtitlePositionTop: "Top",
       subtitlePositionCustom: "Custom",
       subtitlePositionBottom: "Bottom",
-      panelTitle: "VouoA Dictionary",
+      panelTitle: "VouoA",
       jimakuTitle: "Jimaku Subtitles",
       jimakuButton: "Jimaku",
       statusInitFailed: "Initialization failed: {error}",
@@ -333,7 +357,7 @@
       subtitleQueueUi: "显示队列控件",
       clearSubtitle: "清空字幕",
       pauseOnLookup: "点击字幕时暂停视频",
-      closeLookupAfterAdd: "Add Anki 后自动关闭 Lookup",
+      closeLookupAfterAdd: "导出后自动关闭查词",
       lookupCss: "词典CSS",
       subtitleBackground: "字幕背景模糊",
       subtitleBackgroundStylePlate: "Backdrop",
@@ -360,7 +384,6 @@
       jimakuQueryPlaceholder: "作品名 / 日文名 / 罗马字",
       jimakuEpisodePlaceholder: "集数",
       jimakuStatusLocal: "Jimaku API key 保存在插件本地。",
-      lookupViaDesktop: "",
       startBridgeHint: "请启动电脑端 bridge，并在 Yomitan 中开启 API。",
       noSubtitleImported: "当前没有导入字幕。",
       subtitleFollowHint: "先导入一个 srt 或 ass 字幕，再开始跟随视频。",
@@ -383,8 +406,8 @@
       statusDesktopUpdated: "电脑地址已更新。",
       statusPauseOn: "点击字幕时会暂停视频。",
       statusPauseOff: "点击字幕时不再暂停视频。",
-      statusCloseLookupOn: "Add Anki 后会自动关闭 Lookup。",
-      statusCloseLookupOff: "Add Anki 后会保留 Lookup。",
+      statusCloseLookupOn: "导出后会自动关闭查词。",
+      statusCloseLookupOff: "导出后会保留查词。",
       statusLookupCssOn: "已开启词典CSS。",
       statusLookupCssOff: "已关闭词典CSS。",
       statusSubtitleBackgroundOn: "已开启字幕背景模糊。",
@@ -394,7 +417,6 @@
       statusSubtitleOverlayHidden: "字幕浮层已隐藏。",
       statusSubtitleOverlayShown: "字幕浮层已恢复。",
       statusLookupSearching: "正在查找 “{term}”...",
-      statusLookupFound: "找到 {count} 条结果。",
       statusLookupNone: "没有找到 “{term}”。",
       statusNoLookupableWord: "没有找到可查询的词。",
       statusSelectWordFirst: "先输入要查的单词。",
@@ -426,7 +448,7 @@
       subtitlePositionTop: "上方",
       subtitlePositionCustom: "自定义",
       subtitlePositionBottom: "下方",
-      panelTitle: "VouoA Dictionary",
+      panelTitle: "VouoA",
       jimakuTitle: "Jimaku 字幕",
       jimakuButton: "Jimaku",
       statusInitFailed: "初始化失败: {error}",
@@ -589,7 +611,7 @@
     </section>
     <section class="ankiouo-panel ankiouo-hidden">
       <div class="ankiouo-section-head">
-        <h1 class="ankiouo-title" data-i18n="panelTitle">VouoA Dictionary</h1>
+        <h1 class="ankiouo-title" data-i18n="panelTitle">VouoA</h1>
         <button type="button" class="ankiouo-secondary ankiouo-mini" data-action="close-panel" data-i18n="close">Close</button>
       </div>
       <div class="ankiouo-import-row">
@@ -1481,6 +1503,7 @@
 
   async function persistDesktopAnkiUrl(value) {
     const normalized = normalizeDesktopAnkiUrl(value);
+    state.surfaceLookupCache.clear();
     state.desktopLookupCache.clear();
     state.desktopLookupCssCache.clear();
     state.desktopLookupInFlightCache.clear();
@@ -2318,14 +2341,28 @@
     return [];
   }
 
-  async function fetchDesktopAnkiFields(term) {
+  function buildDesktopAnkiFieldsRequestPayload(term, options = {}) {
+    const text = String(term || "").trim();
+    const maxEntries = Math.max(1, Number(options.maxEntries) || 20);
+    return {
+      text,
+      type: "term",
+      markers: DESKTOP_ANKI_FIELDS_MARKERS.slice(),
+      maxEntries,
+      includeMedia: false
+    };
+  }
+
+  async function fetchDesktopAnkiFields(term, options = {}) {
     const key = String(term || "").trim();
     if (!key) return [];
-    if (state.desktopAnkiFieldsCache.has(key)) {
-      return state.desktopAnkiFieldsCache.get(key);
+    const maxEntries = Math.max(1, Number(options.maxEntries) || 20);
+    const cacheKey = `${key}\n${maxEntries}`;
+    if (state.desktopAnkiFieldsCache.has(cacheKey)) {
+      return state.desktopAnkiFieldsCache.get(cacheKey);
     }
-    if (state.desktopAnkiFieldsInFlightCache.has(key)) {
-      return state.desktopAnkiFieldsInFlightCache.get(key);
+    if (state.desktopAnkiFieldsInFlightCache.has(cacheKey)) {
+      return state.desktopAnkiFieldsInFlightCache.get(cacheKey);
     }
     const request = (async () => {
       const response = await fetchDesktopJson(buildDesktopBridgeUrl("/yomitan/ankiFields"), {
@@ -2333,23 +2370,21 @@
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          term: key
-        })
+        body: JSON.stringify(buildDesktopAnkiFieldsRequestPayload(key, { maxEntries }))
       });
       const payload = response.payload;
       if (!response.ok || !payload || payload.ok === false) {
         throw new Error((payload && payload.error) || `HTTP ${response.status}`);
       }
       const normalized = normalizeDesktopAnkiFieldsPayload(payload);
-      state.desktopAnkiFieldsCache.set(key, normalized);
+      state.desktopAnkiFieldsCache.set(cacheKey, normalized);
       return normalized;
     })();
-    state.desktopAnkiFieldsInFlightCache.set(key, request);
+    state.desktopAnkiFieldsInFlightCache.set(cacheKey, request);
     try {
       return await request;
     } finally {
-      state.desktopAnkiFieldsInFlightCache.delete(key);
+      state.desktopAnkiFieldsInFlightCache.delete(cacheKey);
     }
   }
 
@@ -2413,8 +2448,9 @@
       .trim();
   }
 
-  function takeMatchingAnkiFieldsForEntry(entry, pendingFields, fallbackIndex) {
+  function takeMatchingAnkiFieldsForEntry(entry, pendingFields, fallbackIndex, options = {}) {
     if (!Array.isArray(pendingFields) || !pendingFields.length) return null;
+    const allowIndexFallback = options.allowIndexFallback !== false;
 
     const expressionKey = normalizeLookupMatchKey(entry && entry.expression);
     const readingKey = normalizeLookupMatchKey(entry && entry.reading);
@@ -2441,7 +2477,7 @@
     if (matchedIndex < 0 && readingKey) {
       matchedIndex = findIndexBy((item) => normalizeLookupMatchKey(item.reading) === readingKey);
     }
-    if (matchedIndex < 0 && Number.isInteger(fallbackIndex) && fallbackIndex >= 0 && fallbackIndex < pendingFields.length) {
+    if (allowIndexFallback && matchedIndex < 0 && Number.isInteger(fallbackIndex) && fallbackIndex >= 0 && fallbackIndex < pendingFields.length) {
       matchedIndex = fallbackIndex;
     }
     if (matchedIndex < 0) {
@@ -2465,7 +2501,7 @@
     return matched;
   }
 
-  function applyAnkiFieldsToLookupEntries(entries, fieldsList, fallbackTerm) {
+  function applyAnkiFieldsToLookupEntries(entries, fieldsList, fallbackTerm, options = {}) {
     const sourceEntries = Array.isArray(entries) ? entries : [];
     const pendingFields = Array.isArray(fieldsList) ? fieldsList.slice() : [];
     debugLookup("applyAnkiFieldsStart", {
@@ -2474,7 +2510,7 @@
       fallbackTerm
     });
     return sourceEntries.map((entry, entryIndex) => {
-      const normalizedFields = takeMatchingAnkiFieldsForEntry(entry, pendingFields, entryIndex);
+      const normalizedFields = takeMatchingAnkiFieldsForEntry(entry, pendingFields, entryIndex, options);
       if (!normalizedFields || typeof normalizedFields !== "object") {
         debugLookup("applyAnkiFieldsSkipEntry", {
           entryIndex,
@@ -2543,74 +2579,175 @@
     if (!sourceEntries.length) {
       return sourceEntries;
     }
+    const cssStartAt = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
 
     debugLookup("applyLookupCssPerEntryStart", {
       entryCount: sourceEntries.length,
       fallbackTerm
     });
 
-    const concurrency = Math.max(1, Number(options.concurrency) || LOOKUP_CSS_BATCH_CONCURRENCY);
-    const enhanced = await mapWithConcurrency(sourceEntries, concurrency, async (entry, entryIndex) => {
-        const term = String((entry && entry.expression) || fallbackTerm || "").trim();
-        if (!term) {
-          debugLookup("applyLookupCssPerEntrySkipNoTerm", { entryIndex });
-          return entry;
-        }
-        try {
-          let fields;
-          try {
-            fields = await fetchDesktopAnkiFields(term);
-          } catch (firstError) {
-            fields = await fetchDesktopAnkiFields(term);
-          }
-          const [nextEntry] = applyAnkiFieldsToLookupEntries([entry], fields, term);
-          return nextEntry || entry;
-        } catch (error) {
-          debugLookup("applyLookupCssPerEntryError", {
-            entryIndex,
-            term,
-            error: error && error.message ? error.message : String(error)
-          });
-          return entry;
-        }
-      });
+    const sharedTerm = String(fallbackTerm || sourceEntries[0]?.expression || "").trim();
+    let enhanced = sourceEntries.slice();
+    let sharedApplied = false;
+    let sharedHitCount = 0;
 
+    if (sharedTerm) {
+      try {
+        const sharedFields = await fetchDesktopAnkiFields(sharedTerm, {
+          maxEntries: Math.max(sourceEntries.length, 20)
+        });
+        if (Array.isArray(sharedFields) && sharedFields.length) {
+          enhanced = applyAnkiFieldsToLookupEntries(enhanced, sharedFields, sharedTerm, { allowIndexFallback: false });
+          sharedApplied = true;
+          sharedHitCount = enhanced.reduce((count, entry) => count + (entry && entry.remoteFields ? 1 : 0), 0);
+        }
+      } catch (error) {
+        debugLookup("applyLookupCssSharedFieldsError", {
+          term: sharedTerm,
+          error: error && error.message ? error.message : String(error)
+        });
+      }
+    }
+
+    const pendingIndexes = [];
+    enhanced.forEach((entry, entryIndex) => {
+      const term = String((entry && entry.expression) || "").trim();
+      const hasRemoteFields = !!(entry && entry.remoteFields && typeof entry.remoteFields === "object");
+      if (!term) {
+        debugLookup("applyLookupCssPerEntrySkipNoTerm", { entryIndex });
+        return;
+      }
+      if (!hasRemoteFields) {
+        pendingIndexes.push(entryIndex);
+      }
+    });
+
+    if (!pendingIndexes.length) {
+      debugLookup("applyLookupCssPerEntryDone", {
+        sharedApplied,
+        sharedHitCount,
+        fallbackCount: 0,
+        elapsedMs: Math.round((typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - cssStartAt)
+      });
+      return enhanced;
+    }
+
+    const fallbackTerms = pendingIndexes
+      .map((entryIndex) => String((enhanced[entryIndex] && enhanced[entryIndex].expression) || sharedTerm || "").trim())
+      .filter(Boolean);
+    debugLookup("applyLookupCssPerEntryFallback", {
+      sharedApplied,
+      sharedHitCount,
+      pendingCount: pendingIndexes.length,
+      fallbackTerm: sharedTerm,
+      fallbackTerms
+    });
+
+    const concurrency = Math.max(1, Number(options.concurrency) || LOOKUP_CSS_BATCH_CONCURRENCY);
+    const fallbackResults = await mapWithConcurrency(pendingIndexes, concurrency, async (entryIndex) => {
+      const entry = enhanced[entryIndex];
+      const term = String((entry && entry.expression) || sharedTerm || "").trim();
+      if (!term) {
+        return { entryIndex, nextEntry: entry };
+      }
+      try {
+        const fields = await fetchDesktopAnkiFields(term);
+        const [nextEntry] = applyAnkiFieldsToLookupEntries([entry], fields, term);
+        return { entryIndex, nextEntry: nextEntry || entry };
+      } catch (error) {
+        debugLookup("applyLookupCssPerEntryError", {
+          entryIndex,
+          term,
+          error: error && error.message ? error.message : String(error)
+        });
+        return { entryIndex, nextEntry: entry };
+      }
+    });
+
+    fallbackResults.forEach(({ entryIndex, nextEntry }) => {
+      enhanced[entryIndex] = nextEntry;
+    });
+
+    debugLookup("applyLookupCssPerEntryDone", {
+      sharedApplied,
+      sharedHitCount,
+      fallbackCount: pendingIndexes.length,
+      elapsedMs: Math.round((typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - cssStartAt)
+    });
     return enhanced;
   }
 
-  async function fetchDesktopLookup(query) {
+  async function fetchDesktopLookup(query, options = {}) {
     const key = String(query || "").trim();
+    const applyCss = options.applyCss !== false;
     if (!key) {
       return { entries: [], resolvedTerm: "" };
     }
-    if (state.desktopLookupCache.has(key)) {
+    if (applyCss && state.desktopLookupCache.has(key)) {
       return state.desktopLookupCache.get(key);
     }
-    if (state.desktopLookupInFlightCache.has(key)) {
+    if (applyCss && state.desktopLookupInFlightCache.has(key)) {
       return state.desktopLookupInFlightCache.get(key);
     }
     const request = (async () => {
+      const lookupStartAt = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+      debugLookup("lookupRequestStart", {
+        term: key,
+        applyCss
+      });
       const requestUrl = `${buildDesktopBridgeUrl("/lookup")}?term=${encodeURIComponent(key)}`;
       const response = await fetchDesktopJson(requestUrl, { method: "GET" });
       const payload = response.payload;
       if (!response.ok || !payload || payload.ok === false) {
         throw new Error((payload && payload.error) || `HTTP ${response.status}`);
       }
-      const entries = convertDesktopLookupResult(payload.result, key);
+      let entries = convertDesktopLookupResult(payload.result, key);
       const resolvedTerm = entries[0] ? String(entries[0].expression || key).trim() : key;
+      const cacheKey = String(resolvedTerm || key).trim();
+      if (applyCss && state.lookupCssEnabled) {
+        const cachedEntries = state.desktopLookupCssCache.get(cacheKey) || state.desktopLookupCssCache.get(key);
+        if (Array.isArray(cachedEntries) && cachedEntries.length) {
+          entries = cachedEntries.slice();
+        } else {
+          entries = await applyLookupCssPerEntry(entries, cacheKey || key, {
+            concurrency: LOOKUP_CSS_BATCH_CONCURRENCY
+          });
+          if (cacheKey) {
+            state.desktopLookupCssCache.set(cacheKey, entries.slice());
+          }
+        }
+      }
       const normalized = { entries, resolvedTerm };
-      state.desktopLookupCache.set(key, normalized);
+      if (applyCss) {
+        state.desktopLookupCache.set(key, normalized);
+      }
+      debugLookup("lookupRequestEnd", {
+        term: key,
+        applyCss,
+        entryCount: Array.isArray(entries) ? entries.length : 0,
+        resolvedTerm,
+        elapsedMs: Math.round((typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - lookupStartAt)
+      });
       return normalized;
     })();
-    state.desktopLookupInFlightCache.set(key, request);
+    if (applyCss) {
+      state.desktopLookupInFlightCache.set(key, request);
+    }
     try {
       return await request;
     } finally {
-      state.desktopLookupInFlightCache.delete(key);
+      if (applyCss) {
+        state.desktopLookupInFlightCache.delete(key);
+      }
     }
   }
 
   async function fetchDesktopLookupAt(text, index) {
+    const lookupAtStartAt = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+    debugLookup("lookupAtRequestStart", {
+      textLength: String(text || "").length,
+      index: Number(index)
+    });
     const requestUrl = buildDesktopBridgeUrl("/lookup-at");
     const response = await fetchDesktopJson(requestUrl, {
       method: "POST",
@@ -2626,7 +2763,30 @@
     if (!response.ok || !payload || payload.ok === false) {
       throw new Error((payload && payload.error) || `HTTP ${response.status}`);
     }
-    const entries = convertDesktopLookupResult(payload.result, payload.lookupQuery || payload.lookupSurface || "");
+    let entries = convertDesktopLookupResult(payload.result, payload.lookupQuery || payload.lookupSurface || "");
+    const lookupCssTerm = String(payload.lookupSurface || payload.lookupQuery || "").trim();
+    if (state.lookupCssEnabled) {
+      const cacheKey = String(lookupCssTerm || "").trim();
+      const cachedEntries = state.desktopLookupCssCache.get(cacheKey);
+      if (Array.isArray(cachedEntries) && cachedEntries.length) {
+        entries = cachedEntries.slice();
+      } else {
+        entries = await applyLookupCssPerEntry(entries, lookupCssTerm, {
+          concurrency: LOOKUP_CSS_BATCH_CONCURRENCY
+        });
+        if (cacheKey) {
+          state.desktopLookupCssCache.set(cacheKey, entries.slice());
+        }
+      }
+    }
+    debugLookup("lookupAtRequestEnd", {
+      textLength: String(text || "").length,
+      index: Number(index),
+      lookupQuery: String(payload.lookupQuery || "").trim(),
+      lookupSurface: String(payload.lookupSurface || "").trim(),
+      entryCount: Array.isArray(entries) ? entries.length : 0,
+      elapsedMs: Math.round((typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - lookupAtStartAt)
+    });
     return {
       lookupQuery: String(payload.lookupQuery || "").trim(),
       lookupSurface: String(payload.lookupSurface || "").trim(),
@@ -2719,64 +2879,11 @@
     }
   }
 
-  function debugJimaku(kind, details = {}) {
-    try {
-      console.debug("[VouoA jimaku]", {
-        at: new Date().toISOString(),
-        kind,
-        inFlight: !!state.jimakuImportInFlight,
-        view: state.jimakuView || "",
-        selectedEntryId: state.jimakuSelectedEntry && state.jimakuSelectedEntry.id ? state.jimakuSelectedEntry.id : "",
-        selectedFileCount:
-          state.jimakuSelectedFileKeys instanceof Set ? state.jimakuSelectedFileKeys.size : Array.isArray(state.jimakuSelectedFileKeys) ? state.jimakuSelectedFileKeys.length : 0,
-        ...details
-      });
-    } catch (error) {
-      console.debug("[VouoA jimaku]", kind, details);
-    }
-  }
+  function debugJimaku() {}
 
-  function debugLookup(kind, details = {}) {
-    try {
-      const entry = {
-        at: new Date().toISOString(),
-        kind,
-        lookupCssEnabled: !!state.lookupCssEnabled,
-        currentLookupToken: state.currentLookupToken || "",
-        currentLookupSurface: state.currentLookupSurface || "",
-        ...details
-      };
-      window.__vouoaLookupDebug = window.__vouoaLookupDebug || [];
-      window.__vouoaLookupDebug.push(entry);
-      if (window.__vouoaLookupDebug.length > 120) {
-        window.__vouoaLookupDebug.splice(0, window.__vouoaLookupDebug.length - 120);
-      }
-      console.debug("[VouoA lookup]", entry);
-    } catch (error) {
-      console.debug("[VouoA lookup]", kind, details);
-    }
-  }
+  function debugLookup() {}
 
-  function debugRange(kind, details = {}) {
-    try {
-      const entry = {
-        at: new Date().toISOString(),
-        kind,
-        popupHidden: !rangePopup || rangePopup.classList.contains("ankiouo-hidden"),
-        hasRangeEntry: !!state.rangePanelEntry,
-        activeCueIndex: getCueIndex(state.activeCue),
-        ...details
-      };
-      window.__vouoaRangeDebug = window.__vouoaRangeDebug || [];
-      window.__vouoaRangeDebug.push(entry);
-      if (window.__vouoaRangeDebug.length > 120) {
-        window.__vouoaRangeDebug.splice(0, window.__vouoaRangeDebug.length - 120);
-      }
-      console.debug("[VouoA range]", entry);
-    } catch (error) {
-      console.debug("[VouoA range]", kind, details);
-    }
-  }
+  function debugRange() {}
 
   async function ensureDesktopBridgeHostForQuickCheck() {
     const currentValue = desktopAnkiUrlInput ? String(desktopAnkiUrlInput.value || "").trim() : "";
@@ -2817,6 +2924,10 @@
     };
   }
 
+  function setYomitanSuccessStatus(host, serverVersion, yomitanVersion) {
+    setStatus(`Yomitan OK: ${host} | API ${serverVersion} / Yomitan ${yomitanVersion}`);
+  }
+
   async function quickCheckYomitanApiConnection() {
     const host = await ensureDesktopBridgeHostForQuickCheck();
     if (!host) {
@@ -2830,7 +2941,7 @@
     try {
       const { serverVersion, yomitanVersion } = await checkYomitanApiConnection();
       setQuickYomitanButtonIcon("success");
-      setStatus(`Yomitan OK: ${host} | API ${serverVersion} / Yomitan ${yomitanVersion}`);
+      setYomitanSuccessStatus(host, serverVersion, yomitanVersion);
     } catch (error) {
       const message = error && error.message ? error.message : String(error);
       setQuickYomitanButtonIcon("failure");
@@ -2855,7 +2966,7 @@
       throw new Error(t("desktopAddressPrompt"));
     }
     const { serverVersion, yomitanVersion } = await checkYomitanApiConnection();
-    setStatus(`Yomitan OK: ${host} | API ${serverVersion} / Yomitan ${yomitanVersion}`);
+    setYomitanSuccessStatus(host, serverVersion, yomitanVersion);
   }
 
   function getSubtitlePositionLabel() {
@@ -5411,60 +5522,6 @@
     });
   }
 
-  async function renderLookupEntriesWithCss(entries, query, options = {}) {
-    const sourceEntries = Array.isArray(entries) ? entries : [];
-    const target = options.target || results;
-    const requestId = Number(options.requestId) || 0;
-    const contextKey = String(options.contextKey || "");
-    const popup = !!options.popup;
-    const fallbackTerm = String(options.fallbackTerm || query || "").trim();
-    const cacheKey = String(options.cacheKey || fallbackTerm || query || "").trim();
-
-    if (!sourceEntries.length || !state.lookupCssEnabled) {
-      renderEntries(sourceEntries, query, target);
-      if (cacheKey && state.lookupCssEnabled) {
-        state.desktopLookupCssCache.set(cacheKey, sourceEntries.slice());
-      }
-      if (popup) {
-        lookupPopup.classList.remove("ankiouo-hidden");
-      }
-      return sourceEntries;
-    }
-
-    if (cacheKey && state.desktopLookupCssCache.has(cacheKey)) {
-      const cachedEntries = state.desktopLookupCssCache.get(cacheKey) || [];
-      renderEntries(cachedEntries, query, target);
-      if (popup) {
-        lookupPopup.classList.remove("ankiouo-hidden");
-      }
-      return cachedEntries;
-    }
-
-    const rendered = [];
-    let startIndex = 0;
-    while (startIndex < sourceEntries.length) {
-      const batchSize = startIndex === 0 ? LOOKUP_CSS_INITIAL_BATCH_SIZE : LOOKUP_CSS_BATCH_SIZE;
-      const batch = sourceEntries.slice(startIndex, startIndex + batchSize);
-      const enhancedBatch = await applyLookupCssPerEntry(batch, fallbackTerm, {
-        concurrency: LOOKUP_CSS_BATCH_CONCURRENCY
-      });
-      if (!isActiveLookupRequest(requestId, contextKey)) {
-        return rendered;
-      }
-      rendered.push(...enhancedBatch);
-      renderEntries(rendered.slice(), query, target);
-      if (popup) {
-        lookupPopup.classList.remove("ankiouo-hidden");
-      }
-      startIndex += batchSize;
-    }
-
-    if (cacheKey) {
-      state.desktopLookupCssCache.set(cacheKey, rendered.slice());
-    }
-    return rendered;
-  }
-
   function groupEntriesBySurface(entries) {
     const normalizeSurfaceKey = (value) =>
       String(value || "")
@@ -5650,13 +5707,10 @@
       return;
     }
 
-    await renderLookupEntriesWithCss(enriched, normalized, {
-      target: options.target || results,
-      requestId,
-      popup: !!options.popup,
-      fallbackTerm: normalized,
-      cacheKey: normalized
-    });
+    renderEntries(enriched, normalized, options.target || results);
+    if (options.popup) {
+      lookupPopup.classList.remove("ankiouo-hidden");
+    }
     if (!isActiveLookupRequest(requestId)) return;
     if (enriched.length) {
       setStatus("");
@@ -5842,11 +5896,30 @@
   }
 
   async function resolveLookupByClickPosition(text, absoluteIndex) {
+    const fallbackStartAt = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+    debugLookup("lookupFallbackStart", {
+      textLength: String(text || "").length,
+      absoluteIndex: Number(absoluteIndex)
+    });
     const source = String(text || "");
     if (absoluteIndex < 0 || absoluteIndex >= source.length) {
+      debugLookup("lookupFallbackEnd", {
+        textLength: source.length,
+        absoluteIndex: Number(absoluteIndex),
+        found: false,
+        reason: "index-out-of-range",
+        elapsedMs: Math.round((typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - fallbackStartAt)
+      });
       return null;
     }
     if (!isJapaneseChar(source[absoluteIndex])) {
+      debugLookup("lookupFallbackEnd", {
+        textLength: source.length,
+        absoluteIndex: Number(absoluteIndex),
+        found: false,
+        reason: "not-japanese-char",
+        elapsedMs: Math.round((typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - fallbackStartAt)
+      });
       return null;
     }
     const tokens = await tokeniseSubtitle(source);
@@ -5860,11 +5933,27 @@
         continue;
       }
       if (!token.lookupable) {
+        debugLookup("lookupFallbackEnd", {
+          textLength: source.length,
+          absoluteIndex: Number(absoluteIndex),
+          found: false,
+          reason: "token-not-lookupable",
+          elapsedMs: Math.round((typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - fallbackStartAt)
+        });
         return null;
       }
       const lookupSurface = tokenText;
       const directQuery = String(token.lookupQuery || "").trim();
       if (directQuery) {
+        debugLookup("lookupFallbackEnd", {
+          textLength: source.length,
+          absoluteIndex: Number(absoluteIndex),
+          found: true,
+          reason: "token-direct-query",
+          lookupQuery: directQuery,
+          lookupSurface,
+          elapsedMs: Math.round((typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - fallbackStartAt)
+        });
         return {
           lookupQuery: directQuery,
           lookupSurface,
@@ -5874,8 +5963,25 @@
       }
       const resolved = await resolveLookupQuery(lookupSurface);
       if (!resolved) {
+        debugLookup("lookupFallbackEnd", {
+          textLength: source.length,
+          absoluteIndex: Number(absoluteIndex),
+          found: false,
+          reason: "resolve-lookup-query-empty",
+          lookupSurface,
+          elapsedMs: Math.round((typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - fallbackStartAt)
+        });
         return null;
       }
+      debugLookup("lookupFallbackEnd", {
+        textLength: source.length,
+        absoluteIndex: Number(absoluteIndex),
+        found: true,
+        reason: "resolve-lookup-query",
+        lookupQuery: resolved,
+        lookupSurface,
+        elapsedMs: Math.round((typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - fallbackStartAt)
+      });
       return {
         lookupQuery: resolved,
         lookupSurface,
@@ -5883,6 +5989,13 @@
         lookupEnd: end
       };
     }
+    debugLookup("lookupFallbackEnd", {
+      textLength: source.length,
+      absoluteIndex: Number(absoluteIndex),
+      found: false,
+      reason: "no-token-match",
+      elapsedMs: Math.round((typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - fallbackStartAt)
+    });
     return null;
   }
 
@@ -5917,7 +6030,7 @@
     }
 
     try {
-      const remote = await fetchDesktopLookup(key);
+      const remote = await fetchDesktopLookup(key, { applyCss: false });
       if (remote && remote.resolvedTerm) {
         state.surfaceLookupCache.set(key, remote.resolvedTerm);
         return remote.resolvedTerm;
@@ -6108,14 +6221,8 @@
           state.currentLookupToken = lookupQuery;
           state.currentLookupSurface = lookupSurface;
           state.currentLookupClozeContext = clozeContext;
-          await renderLookupEntriesWithCss(resolved.entries, lookupQuery, {
-            target: popupResults,
-            requestId,
-            contextKey,
-            popup: true,
-            fallbackTerm: lookupSurface || lookupQuery,
-            cacheKey: lookupQuery
-          });
+          renderEntries(resolved.entries, lookupQuery, popupResults);
+          lookupPopup.classList.remove("ankiouo-hidden");
           if (!isActiveLookupRequest(requestId, contextKey)) return;
           if (remoteError) {
             const message = t("statusDesktopLookupFallback", { error: remoteError.message });
@@ -6959,9 +7066,6 @@
 
   function togglePanel() {
     panel.classList.toggle("ankiouo-hidden");
-    if (!panel.classList.contains("ankiouo-hidden")) {
-      desktopAnkiUrlInput?.focus();
-    }
   }
 
   function toggleSubtitleOverlayVisibility() {

@@ -304,7 +304,7 @@ function localizeProbeLabel(kind, probe, fallbackLabel) {
     if (code === "disconnected") return t("yomitanDisconnected");
     if (code === "unchecked") return t("yomitanUnchecked");
   }
-  return probe?.label || fallbackLabel;
+  return fallbackLabel;
 }
 
 function renderStatus(snapshot) {
