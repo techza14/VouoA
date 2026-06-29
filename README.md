@@ -55,6 +55,7 @@ The desktop app mainly handles:
 - Subtitle delay can be adjusted by dragging in the input area
 - The swipe jump area is in the upper half of the screen by default
 - Swipe jump can be turned off with its button
+- Enabling Dictionary CSS may make lookups slower
 
 ## Notice
 
