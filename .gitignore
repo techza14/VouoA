@@ -1,6 +1,8 @@
 build/
 out/
 dist/
+third_party/*
+!third_party/.gitignore
 .venv313/
 .agents/
 .codex/

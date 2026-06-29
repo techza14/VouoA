@@ -2,7 +2,7 @@
 
 VouoA 是一个字幕浏览器插件，可配合桌面端使用。
 
-[English README](./README.md)
+[English](./README.md)
 
 ## 主要功能
 

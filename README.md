@@ -2,7 +2,7 @@
 
 VouoA is a subtitle browser extension that works together with the desktop app.
 
-[简体中文说明](./README.zh-CN.md)
+[中文](./README.zh-CN.md)
 
 ## Main Features
 
