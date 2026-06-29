@@ -1,0 +1,17 @@
+build/
+out/
+dist/
+.venv313/
+.agents/
+.codex/
+data/
+vendor/
+__pycache__/
+*.pyc
+*.crx
+*.pem
+*.exe
+*.zip
+*.7z
+*.apkg
+anki_bridge_config.json

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VouoA Desktop</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./main.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="pane pane-settings">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">VouoA Desktop</p>
+            <h1 id="title-settings">Anki Settings</h1>
+          </div>
+        </div>
+
+        <div class="card">
+          <label class="field">
+            <span id="label-default-deck">Default Deck</span>
+            <select id="deck-select"></select>
+          </label>
+
+          <label class="field">
+            <span id="label-default-model">Default Note Type</span>
+            <select id="model-select"></select>
+          </label>
+
+          <label class="field">
+            <span id="label-default-tags">Default Tags</span>
+            <input id="default-tags-input" type="text" placeholder="VouoA" />
+          </label>
+
+          <label class="field">
+            <span id="label-language">Language</span>
+            <select id="language-select">
+              <option value="en">English</option>
+              <option value="zh-CN">中文</option>
+            </select>
+          </label>
+
+          <label class="toggle-row">
+            <div>
+              <strong id="duplicate-title">Duplicate Check</strong>
+              <p id="duplicate-desc">Check existing notes with AnkiConnect before adding</p>
+            </div>
+            <input id="duplicate-check" type="checkbox" />
+          </label>
+
+          <div class="save-line" id="save-state">Ready</div>
+        </div>
+
+        <div class="card mapping-card">
+          <div class="section-head compact">
+            <button id="toggle-mapping" class="ghost-toggle" type="button" aria-expanded="false">
+              <span id="mapping-label">Field Mapping</span>
+              <span id="mapping-chevron">Expand</span>
+            </button>
+            <button id="apply-lapis" class="secondary small" type="button">Use Default Lapis Mapping</button>
+          </div>
+
+          <div id="mapping-panel" class="mapping-panel hidden">
+            <div id="mapping-empty" class="empty hidden">Connect AnkiConnect and choose a note type first.</div>
+            <div id="mapping-grid" class="mapping-grid"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="pane pane-status">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow" id="eyebrow-bridge-control">Bridge Control</p>
+            <h2 id="title-runtime">Runtime Status</h2>
+          </div>
+          <div class="button-row">
+            <button id="restart-bridge" class="primary small" type="button">Restart</button>
+          </div>
+        </div>
+
+        <div class="status-grid">
+          <article class="status-card">
+            <span class="status-label" id="label-bridge">Bridge</span>
+            <strong id="bridge-status">Not checked</strong>
+            <p id="bridge-detail" class="status-detail"></p>
+          </article>
+          <article class="status-card">
+            <span class="status-label" id="label-anki">AnkiConnect</span>
+            <strong id="anki-status">Not checked</strong>
+            <p id="anki-detail" class="status-detail"></p>
+          </article>
+          <article class="status-card">
+            <span class="status-label" id="label-yomitan">Yomitan API</span>
+            <strong id="yomitan-status">Not checked</strong>
+            <p id="yomitan-detail" class="status-detail"></p>
+          </article>
+          <article class="status-card">
+            <span class="status-label" id="label-bind">Bind Address</span>
+            <strong id="bind-status">0.0.0.0:5051</strong>
+            <p id="config-path" class="status-detail"></p>
+          </article>
+        </div>
+
+        <div id="import-error-card" class="card error-card hidden">
+          <div class="section-head compact">
+            <h3 id="title-import-error">Last Import Error</h3>
+          </div>
+          <p id="import-error-detail" class="error-detail"></p>
+        </div>
+
+        <div id="audio-status-card" class="card hidden">
+          <div class="section-head compact">
+            <h3 id="title-audio-status">Latest Audio Status</h3>
+          </div>
+          <p><strong id="audio-status-label"></strong></p>
+          <p id="audio-status-detail" class="status-detail"></p>
+        </div>
+
+        <div class="card logs-card">
+          <div class="section-head compact">
+            <h3 id="title-recent-activity">Recent Activity</h3>
+            <span id="launch-target" class="micro-pill"></span>
+          </div>
+          <ul id="recent-logs" class="log-list"></ul>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
