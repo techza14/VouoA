@@ -21,9 +21,12 @@ const BRIDGE_HOST: &str = "0.0.0.0";
 const BRIDGE_LOCAL_URL: &str = "http://127.0.0.1:5051";
 const PROBE_SUCCESS_TTL: Duration = Duration::from_secs(2);
 const PROBE_FAILURE_TTL: Duration = Duration::from_secs(8);
+const PROBE_FAILURE_TTL_WHILE_STARTING: Duration = Duration::from_millis(250);
 const BRIDGE_PROBE_TIMEOUT: Duration = Duration::from_millis(800);
 const ANKI_PROBE_TIMEOUT: Duration = Duration::from_millis(800);
 const YOMITAN_PROBE_TIMEOUT: Duration = Duration::from_secs(1);
+const BRIDGE_STARTUP_WAIT_TIMEOUT: Duration = Duration::from_secs(4);
+const BRIDGE_STARTUP_WAIT_INTERVAL: Duration = Duration::from_millis(250);
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ProbeState {
@@ -356,6 +359,83 @@ fn is_child_running(state: &SharedState) -> (bool, Option<u32>) {
     }
 }
 
+fn normalize_process_path(path: &Path) -> String {
+    fs::canonicalize(path)
+        .unwrap_or_else(|_| path.to_path_buf())
+        .to_string_lossy()
+        .replace('/', "\\")
+        .to_lowercase()
+}
+
+#[cfg(windows)]
+fn listening_pids_on_port(port: u16) -> Vec<u32> {
+    let Ok(output) = Command::new("netstat").args(["-ano", "-p", "tcp"]).output() else {
+        return Vec::new();
+    };
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    stdout
+        .lines()
+        .filter_map(|line| {
+            let parts = line.split_whitespace().collect::<Vec<_>>();
+            if parts.len() < 5 {
+                return None;
+            }
+            let local = parts[1];
+            let state = parts[3];
+            let pid = parts[4];
+            if state != "LISTENING" {
+                return None;
+            }
+            if !(local.ends_with(&format!(":{port}")) || local.ends_with(&format!("]:{port}"))) {
+                return None;
+            }
+            pid.parse::<u32>().ok()
+        })
+        .collect()
+}
+
+#[cfg(windows)]
+fn process_path_for_pid(pid: u32) -> Option<PathBuf> {
+    let script = format!(
+        "$p = Get-Process -Id {pid} -ErrorAction SilentlyContinue; if ($p -and $p.Path) {{ $p.Path }}"
+    );
+    let output = Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if value.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(value))
+    }
+}
+
+#[cfg(windows)]
+fn find_external_bridge_pid(spec: &BridgeLaunchSpec) -> Option<u32> {
+    let target_path = normalize_process_path(&spec.program);
+    listening_pids_on_port(BRIDGE_PORT).into_iter().find(|pid| {
+        process_path_for_pid(*pid)
+            .map(|path| normalize_process_path(&path) == target_path)
+            .unwrap_or(false)
+    })
+}
+
+#[cfg(windows)]
+fn kill_process_tree(pid: u32) -> Result<(), String> {
+    let status = Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .status()
+        .map_err(|error| format!("Failed to stop bridge process tree: {error}"))?;
+    if !status.success() {
+        return Err(format!("Failed to stop bridge process tree: taskkill exited with {status}"));
+    }
+    Ok(())
+}
+
 pub fn start_bridge(app: &AppHandle, state: &SharedState) -> Result<(), String> {
     let (running, _) = is_child_running(state);
     if running {
@@ -419,18 +499,47 @@ pub fn start_bridge(app: &AppHandle, state: &SharedState) -> Result<(), String> 
     let mut guard = state.inner.lock().expect("shared state poisoned");
     guard.child = Some(child);
     guard.probe_cache = ProbeCache::default();
+    drop(guard);
+    let bridge_ready = wait_for_bridge_ready();
+    invalidate_probe_cache(state);
+    if bridge_ready {
+        push_log(state, "bridge startup confirmed: /health responded");
+    } else {
+        push_log(state, "bridge startup still pending: /health did not respond before timeout");
+    }
     Ok(())
 }
 
-pub fn stop_bridge(state: &SharedState) -> Result<(), String> {
+pub fn stop_bridge(app: &AppHandle, state: &SharedState) -> Result<(), String> {
     let mut guard = state.inner.lock().expect("shared state poisoned");
     if let Some(mut child) = guard.child.take() {
         let pid = child.id();
-        child.kill().map_err(|error| format!("Failed to stop bridge: {error}"))?;
+        #[cfg(windows)]
+        {
+            kill_process_tree(pid)?;
+        }
+        #[cfg(not(windows))]
+        {
+            child.kill().map_err(|error| format!("Failed to stop bridge: {error}"))?;
+        }
         let _ = child.wait();
         guard.logs.push_front(format!("bridge stopped: pid={pid}"));
         while guard.logs.len() > 8 {
             guard.logs.pop_back();
+        }
+    } else {
+        #[cfg(windows)]
+        {
+            let spec = resolve_bridge_launch(app)?;
+            if let Some(pid) = find_external_bridge_pid(&spec) {
+                kill_process_tree(pid)?;
+                guard
+                    .logs
+                    .push_front(format!("bridge stopped: pid={pid} (external match)"));
+                while guard.logs.len() > 8 {
+                    guard.logs.pop_back();
+                }
+            }
         }
     }
     guard.probe_cache = ProbeCache::default();
@@ -438,7 +547,7 @@ pub fn stop_bridge(state: &SharedState) -> Result<(), String> {
 }
 
 pub fn restart_bridge(app: &AppHandle, state: &SharedState) -> Result<(), String> {
-    stop_bridge(state)?;
+    stop_bridge(app, state)?;
     start_bridge(app, state)
 }
 
@@ -477,6 +586,19 @@ fn probe_bridge_health() -> ProbeState {
             code: "disconnected".into(),
             detail: error,
         },
+    }
+}
+
+fn wait_for_bridge_ready() -> bool {
+    let started_at = Instant::now();
+    loop {
+        if probe_bridge_health().ok {
+            return true;
+        }
+        if started_at.elapsed() >= BRIDGE_STARTUP_WAIT_TIMEOUT {
+            return false;
+        }
+        thread::sleep(BRIDGE_STARTUP_WAIT_INTERVAL);
     }
 }
 
@@ -542,19 +664,18 @@ fn cached_probe<F>(
     state: &SharedState,
     select: impl Fn(&ProbeCache) -> &Option<CachedProbeState>,
     update: impl Fn(&mut ProbeCache) -> &mut Option<CachedProbeState>,
+    success_ttl: Duration,
+    failure_ttl: Duration,
+    force_refresh: bool,
     probe_fn: F,
 ) -> ProbeState
 where
     F: FnOnce() -> ProbeState,
 {
-    {
+    if !force_refresh {
         let guard = state.inner.lock().expect("shared state poisoned");
         if let Some(cached) = select(&guard.probe_cache) {
-            let ttl = if cached.probe.ok {
-                PROBE_SUCCESS_TTL
-            } else {
-                PROBE_FAILURE_TTL
-            };
+            let ttl = if cached.probe.ok { success_ttl } else { failure_ttl };
             if cached.checked_at.elapsed() < ttl {
                 return cached.probe.clone();
             }
@@ -570,16 +691,32 @@ where
     probe
 }
 
-pub fn get_snapshot(app: &AppHandle, state: &SharedState) -> Result<AppSnapshot, String> {
+pub fn get_snapshot(app: &AppHandle, state: &SharedState, force_refresh: bool) -> Result<AppSnapshot, String> {
     let (spec, config) = load_config(app)?;
     let (child_running, pid) = is_child_running(state);
-    let bridge = cached_probe(state, |cache| &cache.bridge, |cache| &mut cache.bridge, probe_bridge_health);
+    let bridge_failure_ttl = if child_running {
+        PROBE_FAILURE_TTL_WHILE_STARTING
+    } else {
+        PROBE_FAILURE_TTL
+    };
+    let bridge = cached_probe(
+        state,
+        |cache| &cache.bridge,
+        |cache| &mut cache.bridge,
+        PROBE_SUCCESS_TTL,
+        bridge_failure_ttl,
+        force_refresh,
+        probe_bridge_health,
+    );
     let running = child_running || bridge.ok;
     let anki_connect = if bridge.ok {
         cached_probe(
             state,
             |cache| &cache.anki_connect,
             |cache| &mut cache.anki_connect,
+            PROBE_SUCCESS_TTL,
+            PROBE_FAILURE_TTL,
+            force_refresh,
             probe_anki_connect,
         )
     } else {
@@ -594,6 +731,9 @@ pub fn get_snapshot(app: &AppHandle, state: &SharedState) -> Result<AppSnapshot,
             state,
             |cache| &cache.yomitan_api,
             |cache| &mut cache.yomitan_api,
+            PROBE_SUCCESS_TTL,
+            PROBE_FAILURE_TTL,
+            force_refresh,
             probe_yomitan_api,
         )
     } else {

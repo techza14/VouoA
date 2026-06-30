@@ -20,38 +20,14 @@ pub struct BridgeConfig {
 impl Default for BridgeConfig {
     fn default() -> Self {
         Self {
-            default_deck: "Default".to_string(),
-            default_model: "Lapis".to_string(),
+            default_deck: String::new(),
+            default_model: String::new(),
             default_tags: "VouoA".to_string(),
             language: "en".to_string(),
             duplicate_check: false,
-            field_map: default_lapis_field_map(),
+            field_map: BTreeMap::new(),
         }
     }
-}
-
-pub fn default_lapis_field_map() -> BTreeMap<String, String> {
-    BTreeMap::from([
-        ("Expression".to_string(), "{expression}".to_string()),
-        ("ExpressionAudio".to_string(), "{audio}".to_string()),
-        ("ExpressionFurigana".to_string(), "{furigana-plain}".to_string()),
-        ("ExpressionReading".to_string(), "{reading}".to_string()),
-        ("MainDefinition".to_string(), "{glossary-first}".to_string()),
-        (
-            "Sentence".to_string(),
-            "{cloze-prefix}<b>{cloze-body}</b>{cloze-suffix}".to_string(),
-        ),
-        ("SentenceAudio".to_string(), "{cut-audio}".to_string()),
-        ("Picture".to_string(), "{picture}".to_string()),
-        ("Glossary".to_string(), "{glossary}".to_string()),
-        ("IsClickCard".to_string(), "x".to_string()),
-        ("PitchPosition".to_string(), "{pitch-accent-positions}".to_string()),
-        ("Frequency".to_string(), "{frequencies}".to_string()),
-        (
-            "FreqSort".to_string(),
-            "{frequency-harmonic-rank}".to_string(),
-        ),
-    ])
 }
 
 pub fn value_options() -> Vec<(String, String)> {

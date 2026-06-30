@@ -13,7 +13,13 @@ if not defined APP_VERSION (
 
 cd /d "%REPO_ROOT%\desktop_app"
 
-call npm run build
+if not exist "node_modules\.bin\tauri.cmd" (
+  echo Tauri CLI not found under desktop_app\node_modules. Running npm ci...
+  call npm ci
+  if errorlevel 1 exit /b 1
+)
+
+call node_modules\.bin\tauri.cmd build --no-bundle
 if errorlevel 1 exit /b 1
 
 cd /d "%REPO_ROOT%"
@@ -32,8 +38,6 @@ if errorlevel 1 (
   echo Failed: could not copy desktop exe into portable directory.
   exit /b 1
 )
-
-powershell -NoProfile -Command "Start-Process -FilePath '%PORTABLE_EXE%'"
 
 echo Updated portable desktop app: "%PORTABLE_EXE%"
 exit /b 0

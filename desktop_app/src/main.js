@@ -8,6 +8,8 @@ const state = {
   modelFields: [],
   mappingOpen: false,
   ankiSyncInFlight: null,
+  snapshotInFlight: null,
+  statusWarmupInFlight: null,
   saveTimer: null,
   bridgeBootstrapTried: false,
 };
@@ -20,6 +22,8 @@ const I18N = {
     defaultTags: "Tags",
     defaultTagsPlaceholder: "Comma or space separated, e.g. VouoA",
     language: "Language",
+    languageOptionEnglish: "English",
+    languageOptionChinese: "Chinese",
     duplicateTitle: "Duplicate Check",
     duplicateDesc: "Check existing notes with AnkiConnect before adding",
     ready: "Ready",
@@ -33,7 +37,7 @@ const I18N = {
     confirmApplyLapis: "Replace the current field mapping with the Lapis mapping?",
     bridgeControl: "Bridge Control",
     runtimeTitle: "Runtime Status",
-    restart: "Restart",
+    restart: "Refresh Status",
     bridgeLabel: "Bridge",
     ankiLabel: "AnkiConnect",
     yomitanLabel: "Yomitan API",
@@ -68,6 +72,8 @@ const I18N = {
     defaultTags: "标签",
     defaultTagsPlaceholder: "可用逗号或空格分隔，例如 VouoA",
     language: "语言",
+    languageOptionEnglish: "English",
+    languageOptionChinese: "中文",
     duplicateTitle: "重复检查",
     duplicateDesc: "添加前先用 AnkiConnect 查重",
     ready: "准备就绪",
@@ -81,7 +87,7 @@ const I18N = {
     confirmApplyLapis: "要用 Lapis 映射覆盖当前字段映射吗？",
     bridgeControl: "Bridge Control",
     runtimeTitle: "运行状态",
-    restart: "重启",
+    restart: "刷新状态",
     bridgeLabel: "Bridge",
     ankiLabel: "AnkiConnect",
     yomitanLabel: "Yomitan API",
@@ -193,12 +199,12 @@ async function call(command, payload = {}) {
 function ensureConfig() {
   if (!state.config) {
     state.config = {
-      default_deck: "Default",
-      default_model: "Lapis",
+      default_deck: "",
+      default_model: "",
       default_tags: "VouoA",
       language: "en",
       duplicate_check: false,
-      field_map: { ...LAPIS_FIELD_MAP },
+      field_map: {},
     };
   }
   if (!state.config.field_map || typeof state.config.field_map !== "object") {
@@ -256,6 +262,12 @@ function renderText() {
   }
   if (elements.mappingChevron) {
     elements.mappingChevron.textContent = state.mappingOpen ? t("collapse") : t("expand");
+  }
+  if (elements.languageSelect) {
+    const englishOption = elements.languageSelect.querySelector('option[value="en"]');
+    const chineseOption = elements.languageSelect.querySelector('option[value="zh-CN"]');
+    if (englishOption) englishOption.textContent = t("languageOptionEnglish");
+    if (chineseOption) chineseOption.textContent = t("languageOptionChinese");
   }
 }
 
@@ -502,14 +514,6 @@ async function syncAnkiLists() {
     state.decks = Array.isArray(decks) ? decks : [];
     state.models = Array.isArray(models) ? models : [];
     const config = ensureConfig();
-    if (!config.default_deck && state.decks.length) {
-      config.default_deck = state.decks.includes("Default") ? "Default" : state.decks[0];
-      await saveConfig({ default_deck: config.default_deck });
-    }
-    if (!config.default_model && state.models.length) {
-      config.default_model = state.models.includes("Lapis") ? "Lapis" : state.models[0];
-      await saveConfig({ default_model: config.default_model });
-    }
     renderStaticConfig();
     if (config.default_model) {
       await loadModelFields(config.default_model);
@@ -534,35 +538,30 @@ function requestAnkiSync() {
   return run;
 }
 
-async function refreshSnapshot() {
-  try {
-    const snapshot = await call("get_app_snapshot");
-    state.config = snapshot.config;
-    state.valueOptions = Array.isArray(snapshot.value_options) ? snapshot.value_options : [];
-    renderStaticConfig();
-    renderStatus(snapshot);
-    if (!state.modelFields.length && state.config?.default_model && snapshot.status.anki_connect?.ok) {
-      await loadModelFields(state.config.default_model);
-    }
-    return snapshot;
-  } catch (error) {
-    setSaveState(t("snapshotFailed", { error }), true);
-    return null;
+async function refreshSnapshot(force = false) {
+  if (!force && state.snapshotInFlight) {
+    return state.snapshotInFlight;
   }
-}
-
-async function handleBridgeAction(command) {
-  try {
-    const snapshot = await call(command);
-    state.config = snapshot.config;
-    renderStaticConfig();
-    renderStatus(snapshot);
-    if (shouldSyncAnki(snapshot)) {
-      void requestAnkiSync();
+  const run = (async () => {
+    try {
+      const snapshot = await call("get_app_snapshot", force ? { force: true } : {});
+      state.config = snapshot.config;
+      state.valueOptions = Array.isArray(snapshot.value_options) ? snapshot.value_options : [];
+      renderStaticConfig();
+      renderStatus(snapshot);
+      if (!state.modelFields.length && state.config?.default_model && snapshot.status.anki_connect?.ok) {
+        await loadModelFields(state.config.default_model);
+      }
+      return snapshot;
+    } catch (error) {
+      setSaveState(t("snapshotFailed", { error }), true);
+      return null;
     }
-  } catch (error) {
-    setSaveState(t("actionFailed", { error }), true);
-  }
+  })().finally(() => {
+    state.snapshotInFlight = null;
+  });
+  state.snapshotInFlight = run;
+  return run;
 }
 
 async function ensureBridgeStarted(snapshot) {
@@ -580,6 +579,42 @@ async function ensureBridgeStarted(snapshot) {
     setSaveState(t("bridgeAutostartFailed", { error }), true);
     return snapshot;
   }
+}
+
+function delay(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function refreshRuntimeStatus(options = {}) {
+  const { followBridgeStartup = false, attempts = 8, intervalMs = 300 } = options;
+  if (!followBridgeStartup) {
+    const snapshot = await refreshSnapshot(true);
+    if (shouldSyncAnki(snapshot)) {
+      void requestAnkiSync();
+    }
+    return snapshot;
+  }
+  if (state.statusWarmupInFlight) {
+    return state.statusWarmupInFlight;
+  }
+  const run = (async () => {
+    let snapshot = await refreshSnapshot(true);
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      if (snapshot?.status?.bridge?.ok) {
+        break;
+      }
+      await delay(intervalMs);
+      snapshot = await refreshSnapshot(true);
+    }
+    if (shouldSyncAnki(snapshot)) {
+      await requestAnkiSync();
+    }
+    return snapshot;
+  })().finally(() => {
+    state.statusWarmupInFlight = null;
+  });
+  state.statusWarmupInFlight = run;
+  return run;
 }
 
 function bindEvents() {
@@ -647,23 +682,17 @@ function bindEvents() {
     await saveConfig({ field_map: nextMap });
   });
 
-  elements.restartBridge?.addEventListener("click", () => {
-    handleBridgeAction("restart_bridge_command");
+  elements.restartBridge?.addEventListener("click", async () => {
+    await refreshRuntimeStatus({ followBridgeStartup: true });
   });
 
   window.addEventListener("focus", async () => {
-    const snapshot = await refreshSnapshot();
-    if (shouldSyncAnki(snapshot)) {
-      void requestAnkiSync();
-    }
+    await refreshRuntimeStatus();
   });
 
   document.addEventListener("visibilitychange", async () => {
     if (!document.hidden) {
-      const snapshot = await refreshSnapshot();
-      if (shouldSyncAnki(snapshot)) {
-        void requestAnkiSync();
-      }
+      await refreshRuntimeStatus();
     }
   });
 }
@@ -672,13 +701,9 @@ async function init() {
   bindEvents();
   let snapshot = await refreshSnapshot();
   snapshot = await ensureBridgeStarted(snapshot);
-  if (snapshot && !snapshot.status?.bridge?.ok) {
-    await new Promise((resolve) => window.setTimeout(resolve, 1200));
-    snapshot = await refreshSnapshot();
-  }
-  if (shouldSyncAnki(snapshot)) {
-    await requestAnkiSync();
-  }
+  await refreshRuntimeStatus({
+    followBridgeStartup: !snapshot?.status?.bridge?.ok,
+  });
 }
 
 init().catch((error) => {

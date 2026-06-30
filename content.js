@@ -169,6 +169,8 @@
       save: "Save",
       search: "Search",
       language: "Language",
+      languageOptionEnglish: "English",
+      languageOptionChinese: "Chinese",
       lookupTitle: "",
       lookupStatusHint: "",
       lookupEmpty: "",
@@ -290,6 +292,11 @@
       panelTitle: "VouoA",
       jimakuTitle: "Jimaku Subtitles",
       jimakuButton: "Jimaku",
+      jimakuTypeAnime: "Anime",
+      jimakuTypeLiveAction: "Live Action",
+      launcherSelectionFade: "Fade",
+      launcherSelectionHide: "Hide",
+      launcherSelectionKeep: "Keep",
       statusInitFailed: "Initialization failed: {error}",
       statusAutoSendFailed: "Auto send failed: {error}",
       statusDesktopSendFailed: "Send to desktop Anki failed: {error}",
@@ -330,6 +337,8 @@
       save: "保存",
       search: "搜索",
       language: "语言",
+      languageOptionEnglish: "English",
+      languageOptionChinese: "中文",
       lookupTitle: "",
       lookupStatusHint: "",
       lookupEmpty: "",
@@ -451,6 +460,11 @@
       panelTitle: "VouoA",
       jimakuTitle: "Jimaku 字幕",
       jimakuButton: "Jimaku",
+      jimakuTypeAnime: "Anime",
+      jimakuTypeLiveAction: "Live Action",
+      launcherSelectionFade: "淡化",
+      launcherSelectionHide: "隐藏",
+      launcherSelectionKeep: "不变",
       statusInitFailed: "初始化失败: {error}",
       statusAutoSendFailed: "自动发送失败: {error}",
       statusDesktopSendFailed: "发送到电脑 Anki 失败: {error}",
@@ -585,8 +599,8 @@
         </div>
       </div>
       <div class="ankiouo-impl-switch" data-field="jimakuTypeSwitch">
-        <button type="button" class="ankiouo-secondary ankiouo-mini" data-action="jimaku-type-anime">Anime</button>
-        <button type="button" class="ankiouo-secondary ankiouo-mini" data-action="jimaku-type-live-action">Live Action</button>
+        <button type="button" class="ankiouo-secondary ankiouo-mini" data-action="jimaku-type-anime" data-i18n="jimakuTypeAnime">Anime</button>
+        <button type="button" class="ankiouo-secondary ankiouo-mini" data-action="jimaku-type-live-action" data-i18n="jimakuTypeLiveAction">Live Action</button>
       </div>
       <div class="ankiouo-import-row ankiouo-import-row-wide">
         <input data-field="jimakuApiKey" type="password" autocomplete="off" placeholder="Jimaku API key" data-i18n-placeholder="jimakuApiKeyPlaceholder" />
@@ -672,9 +686,9 @@
       <div class="ankiouo-import-row">
         <label class="ankiouo-field-label ankiouo-inline-label" data-i18n="topButtonsOnSubtitle">Top buttons on subtitle</label>
         <select data-field="launcherSelectionBehavior" class="ankiouo-desktop-url-input">
-          <option value="fade">Fade</option>
-          <option value="hide">Hide</option>
-          <option value="keep">Keep</option>
+          <option value="fade" data-i18n="launcherSelectionFade">Fade</option>
+          <option value="hide" data-i18n="launcherSelectionHide">Hide</option>
+          <option value="keep" data-i18n="launcherSelectionKeep">Keep</option>
         </select>
       </div>
       <div class="ankiouo-import-row" data-field="launcherSelectionOpacityRow">
@@ -718,8 +732,8 @@
       <div class="ankiouo-import-row">
         <label class="ankiouo-field-label ankiouo-inline-label" data-i18n="language">Language</label>
         <select data-field="languageSelect" class="ankiouo-desktop-url-input">
-          <option value="en">English</option>
-          <option value="zh-CN">中文</option>
+          <option value="en" data-i18n="languageOptionEnglish">English</option>
+          <option value="zh-CN" data-i18n="languageOptionChinese">中文</option>
         </select>
       </div>
       <div class="ankiouo-import-row">

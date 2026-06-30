@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableExtensions EnableDelayedExpansion
 
 for %%I in ("%~dp0..") do set "REPO_ROOT=%%~fI"
 cd /d "%REPO_ROOT%"
@@ -12,10 +12,11 @@ if not defined APP_VERSION (
 
 set "OUT_DIR=%CD%\out"
 set "BUILD_DIR=%CD%\build"
-set "STAGE_DIR=%BUILD_DIR%\portable_clean_stage"
 set "PORTABLE_NAME=VouoA_Desktop_Portable_%APP_VERSION%"
 set "PORTABLE_DIR=%OUT_DIR%\%PORTABLE_NAME%"
 set "PORTABLE_ZIP=%OUT_DIR%\%PORTABLE_NAME%.zip"
+set "PORTABLE_ZIP_TMP=%BUILD_DIR%\%PORTABLE_NAME%.zip"
+set "TARGET_ZIP=%PORTABLE_ZIP%"
 set "DESKTOP_APP_DIR=%CD%\desktop_app"
 set "DESKTOP_EXE_SOURCE="
 set "BRIDGE_EXE_SOURCE=%CD%\dist\anki_bridge_server.exe"
@@ -42,7 +43,7 @@ if not exist "node_modules\.bin\tauri.cmd" (
   call npm ci
   if errorlevel 1 exit /b 1
 )
-call npm run build
+call node_modules\.bin\tauri.cmd build --no-bundle
 if errorlevel 1 exit /b 1
 cd /d "%REPO_ROOT%"
 
@@ -83,39 +84,47 @@ if not defined FFMPEG_SOURCE (
 echo [4/5] Creating clean portable staging directory...
 if exist "%PORTABLE_DESKTOP_EXE%" powershell -NoProfile -Command "Get-Process | Where-Object { $_.Path -eq '%PORTABLE_DESKTOP_EXE%' } | Stop-Process -Force"
 if exist "%PORTABLE_BRIDGE_EXE%" powershell -NoProfile -Command "Get-Process | Where-Object { $_.Path -eq '%PORTABLE_BRIDGE_EXE%' } | Stop-Process -Force"
-if exist "%STAGE_DIR%" rmdir /s /q "%STAGE_DIR%"
 if exist "%PORTABLE_DIR%" rmdir /s /q "%PORTABLE_DIR%"
 if exist "%PORTABLE_DIR%" (
   echo Failed: existing portable directory is still locked: "%PORTABLE_DIR%"
   exit /b 1
 )
-mkdir "%STAGE_DIR%"
-mkdir "%STAGE_DIR%\bridge"
+mkdir "%PORTABLE_DIR%"
+mkdir "%PORTABLE_DIR%\bridge"
 
-copy /y "%DESKTOP_EXE_SOURCE%" "%STAGE_DIR%\VouoA_Desktop.exe" >nul
+copy /y "%DESKTOP_EXE_SOURCE%" "%PORTABLE_DIR%\VouoA_Desktop.exe" >nul
 if errorlevel 1 exit /b 1
-copy /y "%BRIDGE_EXE_SOURCE%" "%STAGE_DIR%\bridge\anki_bridge_server.exe" >nul
+copy /y "%BRIDGE_EXE_SOURCE%" "%PORTABLE_DIR%\bridge\anki_bridge_server.exe" >nul
 if errorlevel 1 exit /b 1
-copy /y "%BRIDGE_RES_DIR%\change_deck.bat" "%STAGE_DIR%\bridge\change_deck.bat" >nul
-if errorlevel 1 exit /b 1
-copy /y "%BRIDGE_RES_DIR%\README.txt" "%STAGE_DIR%\bridge\README.txt" >nul
-if errorlevel 1 exit /b 1
-copy /y "%BRIDGE_RES_DIR%\start.bat" "%STAGE_DIR%\bridge\start.bat" >nul
-if errorlevel 1 exit /b 1
-copy /y "%FFMPEG_SOURCE%" "%STAGE_DIR%\bridge\ffmpeg.exe" >nul
+copy /y "%FFMPEG_SOURCE%" "%PORTABLE_DIR%\bridge\ffmpeg.exe" >nul
 if errorlevel 1 exit /b 1
 
-if exist "%STAGE_DIR%\vouoa_desktop.log" del /f /q "%STAGE_DIR%\vouoa_desktop.log"
-if exist "%STAGE_DIR%\bridge\anki_bridge.log" del /f /q "%STAGE_DIR%\bridge\anki_bridge.log"
-
-move /y "%STAGE_DIR%" "%PORTABLE_DIR%" >nul
+if exist "%PORTABLE_DIR%\vouoa_desktop.log" del /f /q "%PORTABLE_DIR%\vouoa_desktop.log"
+if exist "%PORTABLE_DIR%\bridge\anki_bridge.log" del /f /q "%PORTABLE_DIR%\bridge\anki_bridge.log"
 
 echo [5/5] Creating release zip...
 if exist "%PORTABLE_ZIP%" del /f /q "%PORTABLE_ZIP%"
-tar -a -cf "%PORTABLE_ZIP%" -C "%OUT_DIR%" "%PORTABLE_NAME%"
+if exist "%PORTABLE_ZIP%" (
+  set "TARGET_ZIP=%OUT_DIR%\%PORTABLE_NAME%-new.zip"
+  echo Existing release zip is locked. Writing a new file instead:
+  echo "!TARGET_ZIP!"
+)
+if exist "%PORTABLE_ZIP_TMP%" del /f /q "%PORTABLE_ZIP_TMP%"
+tar -a -cf "%PORTABLE_ZIP_TMP%" -C "%OUT_DIR%" "%PORTABLE_NAME%"
 if errorlevel 1 exit /b 1
+if exist "!TARGET_ZIP!" del /f /q "!TARGET_ZIP!"
+if exist "!TARGET_ZIP!" (
+  echo Failed: target release zip is still locked: "!TARGET_ZIP!"
+  exit /b 1
+)
+move /y "%PORTABLE_ZIP_TMP%" "!TARGET_ZIP!" >nul
+if errorlevel 1 (
+  echo Failed: could not write release zip: "!TARGET_ZIP!"
+  echo The target zip may still be locked by another process.
+  exit /b 1
+)
 
 echo Done.
 echo Portable directory: "%PORTABLE_DIR%"
-echo Release zip: "%PORTABLE_ZIP%"
+echo Release zip: "!TARGET_ZIP!"
 exit /b 0

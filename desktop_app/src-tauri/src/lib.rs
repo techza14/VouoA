@@ -10,8 +10,8 @@ use tauri::{
 };
 
 #[tauri::command]
-fn get_app_snapshot(app: AppHandle, state: State<'_, SharedState>) -> Result<bridge::AppSnapshot, String> {
-    get_snapshot(&app, &state)
+fn get_app_snapshot(app: AppHandle, state: State<'_, SharedState>, force: Option<bool>) -> Result<bridge::AppSnapshot, String> {
+    get_snapshot(&app, &state, force.unwrap_or(false))
 }
 
 #[tauri::command]
@@ -22,19 +22,7 @@ fn save_app_config(app: AppHandle, _state: State<'_, SharedState>, config: Bridg
 #[tauri::command]
 fn start_bridge_command(app: AppHandle, state: State<'_, SharedState>) -> Result<bridge::AppSnapshot, String> {
     start_bridge(&app, &state)?;
-    get_snapshot(&app, &state)
-}
-
-#[tauri::command]
-fn stop_bridge_command(app: AppHandle, state: State<'_, SharedState>) -> Result<bridge::AppSnapshot, String> {
-    stop_bridge(&state)?;
-    get_snapshot(&app, &state)
-}
-
-#[tauri::command]
-fn restart_bridge_command(app: AppHandle, state: State<'_, SharedState>) -> Result<bridge::AppSnapshot, String> {
-    restart_bridge(&app, &state)?;
-    get_snapshot(&app, &state)
+    get_snapshot(&app, &state, true)
 }
 
 #[tauri::command]
@@ -106,7 +94,7 @@ pub fn run() {
                     }
                     "quit" => {
                         let state = app.state::<SharedState>();
-                        let _ = stop_bridge(&state);
+                        let _ = stop_bridge(app, &state);
                         app.exit(0);
                     }
                     _ => {}
@@ -128,8 +116,6 @@ pub fn run() {
             get_app_snapshot,
             save_app_config,
             start_bridge_command,
-            stop_bridge_command,
-            restart_bridge_command,
             get_anki_decks,
             get_anki_models,
             get_model_fields

@@ -45,17 +45,5 @@ if errorlevel 1 (
   exit /b 1
 )
 
-powershell -NoProfile -Command "Start-Process -FilePath '%PORTABLE_EXE%' -ArgumentList '--host','0.0.0.0','--port','5051' -WindowStyle Hidden"
-if errorlevel 1 (
-  echo Failed: could not start portable bridge.
-  exit /b 1
-)
-
-powershell -NoProfile -Command "$deadline = [DateTime]::UtcNow.AddSeconds(15); $ready = $false; while ([DateTime]::UtcNow -lt $deadline) { try { $response = Invoke-RestMethod -Uri 'http://127.0.0.1:5051/health' -TimeoutSec 2; if ($response) { $ready = $true; break } } catch {}; Start-Sleep -Milliseconds 300 }; if (-not $ready) { exit 1 }"
-if errorlevel 1 (
-  echo Failed: portable bridge did not become healthy within 15 seconds.
-  exit /b 1
-)
-
 echo Updated portable bridge: "%PORTABLE_EXE%"
 exit /b 0
