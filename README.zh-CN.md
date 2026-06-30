@@ -59,3 +59,8 @@ VouoA 分成两部分：
 ## 用前须知
 
 桌面端 bridge 会在局域网开放接口，不建议在公共网络环境下使用。
+
+## 致谢
+
+- [asbplayer](https://github.com/asbplayer/asbplayer)
+- [yomitan](https://github.com/yomidevs/yomitan)

@@ -60,3 +60,8 @@ The desktop app mainly handles:
 ## Notice
 
 The desktop bridge opens local network endpoints, so it is not recommended to use VouoA on public or untrusted networks.
+
+## Credits
+
+- [asbplayer](https://github.com/asbplayer/asbplayer)
+- [yomitan](https://github.com/yomidevs/yomitan)
